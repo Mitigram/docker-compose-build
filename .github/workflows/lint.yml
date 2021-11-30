@@ -1,0 +1,36 @@
+name: Check for linting
+
+on:
+  # Run manually if necessary
+  workflow_dispatch:
+
+  # Run when PR:s are proposed for inclusion into master
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    name: Lint Code Base
+
+    steps:
+      -
+        name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          # Full git history is needed to get a proper list of changed files
+          # within `super-linter`
+          fetch-depth: 0
+
+      # This lints the files that would be touched by the changes proposed in
+      # the PR. It purposedly avoids the linters that are known to fail on the
+      # current code base, this should be fixed with time.
+      -
+        name: Lint Changes in Code Base
+        uses: github/super-linter/slim@v4
+        env:
+          VALIDATE_ALL_CODEBASE: false
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
