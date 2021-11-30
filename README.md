@@ -100,7 +100,8 @@ various steps that it performs more verbosedly on the stderr.
 When the flag is given or the variable set to `1`, the images specified by the
 compose file will also be pushed to their respective registries, once building
 has finished. Your local `docker` client must have enough credentials to access
-the remote registry.
+the remote registries. Old images will automatically be
+[skipped](#option--a-and-build_age-variable).
 
 ### Option `-f` and `BUILD_COMPOSE` Variable
 
@@ -144,9 +145,10 @@ the one from the compose file.
 
 Specifies the maximum age of the image since creation to decide whether it
 should be pushed or not. This is a safety measure to avoid pushing junk images
-that would have been built in the past. The default of `1200` seconds should
-work in most cases, but any negative value will turn this check off, meaning
-that all relevant images will be pushed, disregarding their age.
+that would have been built at a prior run of the script, but without the
+[`-p`](#flag--p-and-build_push-variable) flag. The default of `1200` seconds
+should work in most cases, but any negative value will turn this check off,
+meaning that all relevant images will be pushed, disregarding their age.
 
 ### `BUILD_COMPOSE_BIN` Variable
 
