@@ -105,6 +105,9 @@ warn() { _message "WRN" "$1"; }
 # given, it should be an integer and only the lines at this exact identation
 # level passed will be returned
 service() {
+  # shellcheck disable=SC3043
+  local svc_line end_line lvl || true
+
   if [ -z "${2:-}" ]; then
     # Find the line (within the services section) where the service definition
     # for $1 starts.
@@ -223,6 +226,9 @@ image() {
 # the original tag from the image will be kept. All other arguments will be
 # blindly passed to the docker build command.
 docker_build() {
+  # shellcheck disable=SC3043
+  local image context dockerfile buildercmd || true
+
   # Pick image name to build, at proper tag
   if [ -z "${2:-}" ]; then
     verbose "Building image from service $1"
@@ -271,6 +277,9 @@ docker_build() {
 # to be the value of the second parameter.  When the second argument is empty,
 # the original tag from the image will be kept.
 image_push() {
+  # shellcheck disable=SC3043
+  local image isodate tstamp now age || true
+
   # Pick image name to push, at proper tag
   if [ -z "${2:-}" ]; then
     verbose "Conditionally pushing image from service $1"
