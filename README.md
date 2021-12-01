@@ -5,10 +5,15 @@ This script considers the `docker-compose.yml` file as the single point of truth
 for build information and will supplement/replace `docker compose build` with
 `docker build` in order to:
 
-+ Push the resulting image(s) to their registries.
-+ Replace the registry settings from the compose file with another one, if
-  necessary.
-+ Retag, or add tags to the images that will be built and/or pushed.
++ [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
+  registries.
++ [Replace](#option--r-and-build_registry-variable) the registry settings from
+  the compose file with another one, if necessary.
++ [Re-tag](#option--t-and-build_tags-variable), or add tags to the images that
+  will be built and/or pushed.
++ Perform some (automated)
+  [initialisation](#option--i-and-build_init_dir-variable) actions prior to
+  building/pushing.
 
 This script has sane defaults. If `docker-compose` is installed, its default
 behaviour is to build all or some of the services that are pointed at by the
@@ -27,7 +32,8 @@ line. This is to facilitate automation. All other output (logging, output of
 
 ### Compose Example
 
-All examples are based on the following compose skeleton:
+The script is designed to work against compose files according to the following
+skeleton:
 
 ```yaml
 version: "2.2"
@@ -149,6 +155,24 @@ that would have been built at a prior run of the script, but without the
 [`-p`](#flag--p-and-build_push-variable) flag. The default of `1200` seconds
 should work in most cases, but any negative value will turn this check off,
 meaning that all relevant images will be pushed, disregarding their age.
+
+### Option `-i` and `BUILD_INIT_DIR` Variable
+
+Specifies a list of directory paths, separated by the colon `:` sign wherefrom
+to find and execute initialisation actions. All exectuable (scripts or programs)
+in these directories will automatically be executed once the script
+initialisation has ended and before build and push operations are about to
+start. Initialisation happens in the order of the directories in the path, and
+in the alphabetical order of the executable files, within each directory. All
+variables starting with `BUILD_` are exported prior to running these
+out-of-script initialisation actions, the variables will reflect the state of
+the script after its initialisation has performed. In other words, variables
+such as [`BUILD_BUILDER`](#option--b-and-build_builder-variable) will reflect
+the builder that is about to be used.
+
+The default for this variable are the directories named
+[`build-init.d`](./build-init.d/README.md) in the current directory, and the
+directory containint the script.
 
 ### `BUILD_COMPOSE_BIN` Variable
 

@@ -1,14 +1,17 @@
-#!/usr/bin/env sh
+#!/bin/sh
 
 # If editing from Windows. Choose LF as line-ending
 
 # This script builds (and push) Docker images that have build information in a
 # docker-compose file.
 
+# Stop on errors and unset vars. Sane defaults
 set -eu
 
+# Compute the root directory where the script is located
 ROOT_DIR=${ROOT_DIR:-"$( cd -P -- "$(dirname -- "$(command -v -- "$0")")" && pwd -P )"}
 
+# Look for $2 in colon separated path-like in $1
 pathfind() {
   printf %s\\n "$1"|sed 's/:/\n/g'|grep -vE '^$'|while IFS= read -r dir; do
     find "$dir" -mindepth 1 -maxdepth 1 -name "$2" 2>/dev/null
@@ -52,6 +55,9 @@ BUILD_VERBOSE=${BUILD_VERBOSE:-0}
 BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 
+# Directories to source any initialisation scripts from
+BUILD_INIT_DIR=${BUILD_INIT_DIR:-${ROOT_DIR%/}/build-init.d:$(pwd)/build-init.d}
+
 usage() {
   # This uses the comments behind the options to show the help. Not extremly
   # correct, but effective and simple.
@@ -62,7 +68,7 @@ usage() {
   exit "${1:-0}"
 }
 
-while getopts "f:b:s:t:r:a:pvh?-" opt; do
+while getopts "f:b:s:t:r:a:i:pvh?-" opt; do
   case "$opt" in
     f) # Path to docker compose file to use. Defaults to docker-compose.yml in current directory or same directory as script.
       BUILD_COMPOSE=$OPTARG;;
@@ -78,6 +84,8 @@ while getopts "f:b:s:t:r:a:pvh?-" opt; do
       BUILD_REGISTRY=$OPTARG;;
     a) # Maximum age of the image when pushing, older will be discarded. Negative to turn off.
       BUILD_AGE=$OPTARG;;
+    i) # Colon separated list of directories which content will be executed after init, before build
+      BUILD_INIT_DIR=$OPTARG;;
     v) # More verbosity on stderr
       BUILD_VERBOSE=1;;
     h | \?) # Print this help and exit
@@ -319,6 +327,10 @@ image_push() {
 }
 
 
+#########
+# STEP 1: Initialisation and Run-Time Checks
+#########
+
 # Cannot continue without a docker-compose file
 if ! [ -f "$BUILD_COMPOSE" ]; then
   warn "Cannot find compose file at ${BUILD_COMPOSE}!"
@@ -372,6 +384,39 @@ fi
 # services section starts in the file.
 indent=$(grep -E '^\s+' "$BUILD_COMPOSE" |head -n 1|sed -E 's/^(\s+).*/\1/')
 svc_section=$(grep -En '^services' "$BUILD_COMPOSE"|cut -d: -f1)
+
+
+#########
+# STEP 2: Out-of-Script Initialisation via Directory Content
+#########
+
+# Exports all variables starting with BUILD_ so initialisation programs/scripts,
+# if any can take decisions.
+for v in $(set | grep -E '^BUILD_' | sed -E 's/^(BUILD_[A-Z_]+)=.*/\1/g'); do
+  # shellcheck disable=SC2163
+  export "$v"
+done
+
+# Arrange to execute all programs/scripts that are present in the colon
+# separated list of directories passed as BUILD_INIT_DIR.
+printf %s\\n "$BUILD_INIT_DIR" |
+  sed 's/:/\n/g' |
+  grep -vE '^$' |
+  while IFS= read -r dir
+do
+  if [ -d "$dir" ]; then
+    find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
+      sort | while IFS= read -r initfile; do
+        warn "Loading initialisation file at $initfile"
+        "$initfile"
+      done
+  fi
+done
+
+
+#########
+# STEP 3: Build Images
+#########
 
 if [ -z "$BUILD_SERVICES" ]; then
   verbose "Will build all services out of $BUILD_COMPOSE"
@@ -448,6 +493,11 @@ case "$BUILD_BUILDER" in
     done
     ;;
 esac
+
+
+#########
+# STEP 4: Push Images
+#########
 
 # Push if requested
 if [ "$BUILD_PUSH" = "1" ]; then
