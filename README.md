@@ -28,6 +28,15 @@ The result of this script is a list of the Docker images that were built (or
 line. This is to facilitate automation. All other output (logging, output of
 `docker` or `docker-compose`, etc.) is redirected to `stderr`.
 
+To use this script in your projects, you can either make this project a
+[submodule] or [subtree] of your main project, or simply copy the last version
+of the script. The script will automatically check if there are new versions
+available once all build and push operations have finished. It will print a
+warning when a new version is available.
+
+  [submodule]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
+  [subtree]: https://git-memo.readthedocs.io/en/latest/subtree.html
+
 ## Example
 
 ### Compose Example

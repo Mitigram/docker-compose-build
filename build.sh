@@ -18,6 +18,9 @@ pathfind() {
   done | head -n 1
 }
 
+# Version of script, this should be increased for each new release of the script
+BUILD_VERSION=1.1.0
+
 # The location of the compose file. This file contains information about the
 # images to generate.
 BUILD_COMPOSE=${BUILD_COMPOSE:-$(pathfind "$(pwd):${ROOT_DIR%/}" docker-compose.yml)}
@@ -57,6 +60,14 @@ BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 
 # Directories to source any initialisation scripts from
 BUILD_INIT_DIR=${BUILD_INIT_DIR:-${ROOT_DIR%/}/build-init.d:$(pwd)/build-init.d}
+
+# Command to use to download stuff. This command should take an additional
+# argument, the URL to download and dump the content of the URL to the stdout.
+# When empty, the default, one of curl or wget, if present, will be used.
+BUILD_DOWNLOADER=${BUILD_DOWNLOADER:-}
+
+# Name of the project at GitHub, there is is little point in changing this...
+BUILD_GH_PROJECT=Mitigram/docker-compose-build
 
 usage() {
   # This uses the comments behind the options to show the help. Not extremly
@@ -385,6 +396,16 @@ fi
 indent=$(grep -E '^\s+' "$BUILD_COMPOSE" |head -n 1|sed -E 's/^(\s+).*/\1/')
 svc_section=$(grep -En '^services' "$BUILD_COMPOSE"|cut -d: -f1)
 
+if [ -z "${BUILD_DOWNLOADER:-}" ]; then
+  if command -v "curl" >/dev/null 2>&1; then
+    BUILD_DOWNLOADER="curl -sSL"
+  elif command -v "wget" >/dev/null 2>&1; then
+    BUILD_DOWNLOADER="wget -q -O -"
+  else
+    verbose "Could neither find curl, nor wget. Will not check for new versions"
+  fi
+fi
+
 
 #########
 # STEP 2: Out-of-Script Initialisation via Directory Content
@@ -515,4 +536,24 @@ if [ "$BUILD_PUSH" = "1" ]; then
       done
     fi
   done
+fi
+
+
+#########
+# STEP 5: Check for New Versions
+#########
+if [ -n "$BUILD_DOWNLOADER" ]; then
+  # Pick the latest release out of the HTML for the releases description. This
+  # avoids the GitHub API on purpose to avoid being rate-limited.
+  release=$(  $BUILD_DOWNLOADER "https://github.com/${BUILD_GH_PROJECT}/releases" |
+              grep -Eo "href=\"/${BUILD_GH_PROJECT}/releases/tag/v?[0-9]+(\\.[0-9]+){1,2}\"" |
+              grep -v no-underline |
+              head -n 1 |
+              cut -d '"' -f 2 |
+              awk '{n=split($NF,a,"/");print a[n]}' |
+              awk 'a !~ $0{print}; {a=$0}' |
+              grep -Eo "[0-9]+(\\.[0-9]+){1,2}" )
+  if [ "$release" != "$BUILD_VERSION" ]; then
+    warn "v$release of this script is available, you are running v$BUILD_VERSION"
+  fi
 fi
