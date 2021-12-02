@@ -390,6 +390,9 @@ case "$BUILD_BUILDER" in
       exit 1
     fi
     ;;
+  "" )
+    verbose "Empty builder, no build will be performed"
+    ;;
   * )
     warn "$BUILD_BUILDER is not a known builder type!"
     exit 1
@@ -459,10 +462,12 @@ done
 # STEP 3: Build Images
 #########
 
-if [ -z "$BUILD_SERVICES" ]; then
-  verbose "Will build all services out of $BUILD_COMPOSE"
-else
-  verbose "Will build following services from $BUILD_COMPOSE: $BUILD_SERVICES"
+if [ -n "$BUILD_BUILDER" ]; then
+  if [ -z "$BUILD_SERVICES" ]; then
+    verbose "Will build all services out of $BUILD_COMPOSE"
+  else
+    verbose "Will build following services from $BUILD_COMPOSE: $BUILD_SERVICES"
+  fi
 fi
 
 # Build image

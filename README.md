@@ -142,6 +142,16 @@ Specifies the builder to use, can be one of:
 + `buildx`: will use the new `buildx` for building. This requires the `buildx`
   Docker plugin to be available and properly installed.
 + `docker` or `build`: will use the old-style `docker build` command.
++ An empty string: will not build anything, only push in case
+  [`-p`](#flag--p-and-build_push-variable) was specified. Out-of-script
+  [initialisation](#option--i-and-build_init_dir-variable) will still happen.
+  This facilitates running the script in two distinct phases, i.e. first build,
+  then push, as in the following example:
+
+```shell
+./build.sh;          # Build, do not push
+./build.sh -b "" -p; # Do not build, but push
+```
 
 ### Option `-s` and `BUILD_SERVICES` Variable
 
