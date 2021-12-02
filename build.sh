@@ -19,7 +19,7 @@ pathfind() {
 }
 
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.1.0
+BUILD_VERSION=1.2.0
 
 # The location of the compose file. This file contains information about the
 # images to generate.
