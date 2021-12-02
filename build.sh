@@ -19,7 +19,7 @@ pathfind() {
 }
 
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.2.0
+BUILD_VERSION=1.2.1-beta
 
 # The location of the compose file. This file contains information about the
 # images to generate.
@@ -445,6 +445,7 @@ printf %s\\n "$BUILD_INIT_DIR" |
   while IFS= read -r dir
 do
   if [ -d "$dir" ]; then
+    verbose "Executing all executable files directly under '$dir', in alphabetical order"
     find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
       sort | while IFS= read -r initfile; do
         if [ "$BUILD_DRYRUN" = "1" ]; then
