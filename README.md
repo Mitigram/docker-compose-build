@@ -1,9 +1,11 @@
 # docker-compose-build
 
 Using `docker-compose` in dev, but a more complex orchestrator in production?
-This script considers the `docker-compose.yml` file as the single point of truth
-for build information and will supplement/replace `docker compose build` with
-`docker build` in order to:
+This script uses the `docker-compose.yml` file to capture building information
+for your images, but can help out when pushing to several registries or tagging
+them with a release number (from a GitHub workflow?), for example. The script
+supplements and/or replaces `docker compose build` with `docker build` in order
+to:
 
 + [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
   registries.
@@ -211,3 +213,21 @@ in theory, possible to use alternatives such as [podman] or [nerdctl].
 
   [podman]: https://github.com/containers/podman
   [nerdctl]: https://github.com/containerd/nerdctl
+
+### `BUILD_ROOTDIR` Variable
+
+Specifies the root directory for the script, and is automatically initialised to
+the root directory of the script. The root directory is used in the default
+value for a number of other variables, e.g.
+[`BUILD_INIT_DIR`](#option--i-and-build_init_dir-variable) or
+[`BUILD_COMPOSE`](#option--f-and-build_compose-variable). `BUILD_ROOTDIR` will
+be passed further to out-of-script
+[initialisations](#option--i-and-build_init_dir-variable) to help them locating
+the triggering script, if necessary.
+
+### `BUILD_DOWNLOADER`
+
+Specifies the command used to download release information from GitHub. This
+command should take an additional argument, the URL to download and dump the
+content of the URL to `stdout`. When empty, the default, one of `curl` or
+`wget`, if present, will be used.
