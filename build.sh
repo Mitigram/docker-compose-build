@@ -9,7 +9,7 @@
 set -eu
 
 # Compute the root directory where the script is located
-ROOT_DIR=${ROOT_DIR:-"$( cd -P -- "$(dirname -- "$(command -v -- "$0")")" && pwd -P )"}
+BUILD_ROOTDIR=${BUILD_ROOTDIR:-"$( cd -P -- "$(dirname -- "$(command -v -- "$0")")" && pwd -P )"}
 
 # Look for $2 in colon separated path-like in $1
 pathfind() {
@@ -23,7 +23,7 @@ BUILD_VERSION=1.2.1-beta
 
 # The location of the compose file. This file contains information about the
 # images to generate.
-BUILD_COMPOSE=${BUILD_COMPOSE:-$(pathfind "$(pwd):${ROOT_DIR%/}" docker-compose.yml)}
+BUILD_COMPOSE=${BUILD_COMPOSE:-$(pathfind "$(pwd):${BUILD_ROOTDIR%/}" docker-compose.yml)}
 
 # The list of services to build/push for. When empty, this will be a good guess
 # of all services (the guess is perfect when building with compose).
@@ -62,7 +62,7 @@ BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 
 # Directories to source any initialisation scripts from
-BUILD_INIT_DIR=${BUILD_INIT_DIR:-${ROOT_DIR%/}/build-init.d:$(pwd)/build-init.d}
+BUILD_INIT_DIR=${BUILD_INIT_DIR:-${BUILD_ROOTDIR%/}/build-init.d:$(pwd)/build-init.d}
 
 # Command to use to download stuff. This command should take an additional
 # argument, the URL to download and dump the content of the URL to the stdout.
