@@ -61,8 +61,9 @@ BUILD_DRYRUN=${BUILD_DRYRUN:-0}
 BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 
-# Directories to source any initialisation scripts from
+# Directories to source any initialisation/cleanup scripts from
 BUILD_INIT_DIR=${BUILD_INIT_DIR:-${BUILD_ROOTDIR%/}/build-init.d:$(pwd)/build-init.d}
+BUILD_CLEANUP_DIR=${BUILD_CLEANUP_DIR:-${BUILD_ROOTDIR%/}/build-cleanup.d:$(pwd)/build-cleanup.d}
 
 # Command to use to download stuff. This command should take an additional
 # argument, the URL to download and dump the content of the URL to the stdout.
@@ -82,7 +83,12 @@ usage() {
   exit "${1:-0}"
 }
 
-while getopts "f:b:s:t:r:a:i:pnvh?-" opt; do
+# Use standard getops. Options first, then flags, in alphabetical order
+while getopts "a:b:c:f:i:r:s:t:hnpv?-" opt; do
+  # The order of this case statement is used for printing out the usage
+  # description. So, rather than having it in the same order as the getopts
+  # string spec. above, the options and flags are arranged in order of priority:
+  # from most important to less.
   case "$opt" in
     f) # Path to docker compose file to use. Defaults to docker-compose.yml in current directory or same directory as script.
       BUILD_COMPOSE=$OPTARG;;
@@ -90,16 +96,18 @@ while getopts "f:b:s:t:r:a:i:pnvh?-" opt; do
       BUILD_PUSH=1;;
     b) # Builder to use: compose, auto, docker or buildx
       BUILD_BUILDER=$OPTARG;;
-    s) # List of (compose) services to build/push, defaults to all that have a build context
-      BUILD_SERVICES=$OPTARG;;
     t) # Tag to give to images, forces use of auto for builder when specified.
       BUILD_TAGS=$OPTARG;;
     r) # Docker registry+leading path to push to, instead of the one from Docker compose file. Forces use of auto for builder when specified
       BUILD_REGISTRY=$OPTARG;;
-    a) # Maximum age of the image when pushing, older will be discarded. Negative to turn off.
-      BUILD_AGE=$OPTARG;;
+    s) # List of (compose) services to build/push, defaults to all that have a build context
+      BUILD_SERVICES=$OPTARG;;
     i) # Colon separated list of directories which content will be executed after init, before build
       BUILD_INIT_DIR=$OPTARG;;
+    c) # Colon separated list of directories which content will be executed once all images built and pushed
+      BUILD_CLEANUP_DIR=$OPTARG;;
+    a) # Maximum age of the image when pushing, older will be discarded. Negative to turn off.
+      BUILD_AGE=$OPTARG;;
     n) # Just show what would be done instead
       BUILD_DRYRUN=1;;
     v) # More verbosity on stderr
@@ -112,6 +120,9 @@ while getopts "f:b:s:t:r:a:i:pnvh?-" opt; do
       usage 1;;
   esac
 done
+
+# Shift forward, everything remaining at the command line will be passed to
+# docker-compose build or docker build (depending on the chosen builder).
 shift $((OPTIND-1))
 
 # Poor man's logging
@@ -296,10 +307,12 @@ docker_build() {
     # When we won't have to push, the list of images printed on the stdout is the
     # list of built images. So print the name of the image out.
     if [ "$BUILD_PUSH" = "0" ]; then
+      BUILD_IMAGES="$BUILD_IMAGES $image"
       printf %s\\n "$image"
     fi
   fi
 }
+
 
 # Push the image for the service passed as a first parameter, forcing its tag
 # to be the value of the second parameter.  When the second argument is empty,
@@ -344,6 +357,7 @@ image_push() {
         # When we have to push, the list of images printed on the stdout is the
         # list of pushed images. So print the name of the image out.
         if [ "$BUILD_PUSH" = "1" ]; then
+          BUILD_IMAGES="$BUILD_IMAGES $image"
           printf %s\\n "$image"
         fi
       else
@@ -351,6 +365,31 @@ image_push() {
       fi
     fi
   fi
+}
+
+
+# Execute all init/cleanup programs present in the colon separated list of
+# directories passed as $1. The second argument is used to log what type of
+# files this is (initialisation, cleanup).
+execute() {
+  printf %s\\n "$1" |
+    sed 's/:/\n/g' |
+    grep -vE '^$' |
+    while IFS= read -r dir
+  do
+    if [ -d "$dir" ]; then
+      verbose "Executing all executable files directly under '$dir', in alphabetical order"
+      find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
+        sort | while IFS= read -r initfile; do
+          if [ "$BUILD_DRYRUN" = "1" ]; then
+            warn "Would load $2 file at $initfile"
+          else
+            warn "Loading $2 file at $initfile"
+            "$initfile"
+          fi
+        done
+    fi
+  done
 }
 
 
@@ -439,25 +478,9 @@ done
 
 # Arrange to execute all programs/scripts that are present in the colon
 # separated list of directories passed as BUILD_INIT_DIR.
-printf %s\\n "$BUILD_INIT_DIR" |
-  sed 's/:/\n/g' |
-  grep -vE '^$' |
-  while IFS= read -r dir
-do
-  if [ -d "$dir" ]; then
-    verbose "Executing all executable files directly under '$dir', in alphabetical order"
-    find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
-      sort | while IFS= read -r initfile; do
-        if [ "$BUILD_DRYRUN" = "1" ]; then
-          warn "Would load initialisation file at $initfile"
-        else
-          warn "Loading initialisation file at $initfile"
-          "$initfile"
-        fi
-      done
-  fi
-done
+execute "$BUILD_INIT_DIR" "initialisation"
 
+BUILD_IMAGES=
 
 #########
 # STEP 3: Build Images
@@ -494,6 +517,7 @@ case "$BUILD_BUILDER" in
                   grep "Successfully tagged" |
                   sed -E 's/^Successfully tagged\s+(.*)/\1/')
         if [ "$BUILD_PUSH" = "0" ]; then
+          BUILD_IMAGES="$BUILD_IMAGES $image"
           printf %s\\n "$image"
         fi
       fi
@@ -507,6 +531,7 @@ case "$BUILD_BUILDER" in
                     grep "Successfully tagged" |
                     sed -E 's/^Successfully tagged\s+(.*)/\1/')
           if [ "$BUILD_PUSH" = "0" ]; then
+            BUILD_IMAGES="$BUILD_IMAGES $image"
             printf %s\\n "$image"
           fi
         fi
@@ -540,6 +565,7 @@ case "$BUILD_BUILDER" in
                   "$(image "$svc" "$tag")" 1>&2
 
                 if [ "$BUILD_PUSH" = "0" ]; then
+                  BUILD_IMAGES="$BUILD_IMAGES $(image "$svc" "$tag")"
                   printf %s\\n "$(image "$svc" "$tag")"
                 fi
               fi
@@ -578,7 +604,21 @@ fi
 
 
 #########
-# STEP 5: Check for New Versions
+# STEP 5: Out-of-Script Cleanup via Directory Content
+#########
+
+# Arrange for the list of images that were built or pushed (pushed images have
+# precedence) to be given to the cleanup scripts.
+BUILD_IMAGES=$(printf %s\\n "$BUILD_IMAGES" | sed -E 's/^ //')
+export BUILD_IMAGES
+
+# Arrange to execute all programs/scripts that are present in the colon
+# separated list of directories passed as BUILD_CLEANUP_DIR.
+execute "$BUILD_CLEANUP_DIR" "cleanup"
+
+
+#########
+# STEP 6: Check for New Versions
 #########
 if [ -n "$BUILD_DOWNLOADER" ]; then
   verbose "Checking latest version of project $BUILD_GH_PROJECT at GitHub"

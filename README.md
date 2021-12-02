@@ -16,6 +16,9 @@ to:
 + Perform some (automated)
   [initialisation](#option--i-and-build_init_dir-variable) actions prior to
   building/pushing.
++ Perform some (automated) [cleanup](#option--c-and-build_cleanup_dir-variable)
+  actions once all images have been built and/or pushed. This can be used to
+  trigger actions at the orchestration layer, for example.
 
 This script has sane defaults. If `docker-compose` is installed, its default
 behaviour is to build all or some of the services that are pointed at by the
@@ -119,6 +122,12 @@ the various steps that it would perform on the `stderr`, but not actually do
 anything. No image name will be printed out on the `stdout`, as no image was
 built or pushed.
 
+### Option `-f` and `BUILD_COMPOSE` Variable
+
+Specifies the location of the compose file to use. The default is to look for a
+file called `docker-compose.yml` first in the current directory, then in the
+same directory as the script is located at.
+
 ### Flag `-p` and `BUILD_PUSH` Variable
 
 When the flag is given or the variable set to `1`, the images specified by the
@@ -126,12 +135,6 @@ compose file will also be pushed to their respective registries, once building
 has finished. Your local `docker` client must have enough credentials to access
 the remote registries. Old images will automatically be
 [skipped](#option--a-and-build_age-variable).
-
-### Option `-f` and `BUILD_COMPOSE` Variable
-
-Specifies the location of the compose file to use. The default is to look for a
-file called `docker-compose.yml` first in the current directory, then in the
-same directory as the script is located at.
 
 ### Option `-b` and `BUILD_BUILDER` Variable
 
@@ -200,7 +203,23 @@ the builder that is about to be used.
 
 The default for this variable are the directories named
 [`build-init.d`](./build-init.d/README.md) in the current directory, and the
-directory containint the script.
+directory containing the script.
+
+### Option `-c` and `BUILD_CLEANUP_DIR` Variable
+
+Specifies a list of directory paths, separated by the colon `:` sign wherefrom
+to find and execute cleanup actions. All exectuable (scripts or programs) in
+these directories will automatically be executed once images have been built and
+pushed. Cleanup happens in the order of the directories in the path, and in the
+alphabetical order of the executable files, within each directory. All variables
+starting with `BUILD_` are exported prior to running these out-of-script cleanup
+actions, similarily to the [`-i`](#option--i-and-build_init_dir-variable)
+option. In addition, cleanup actions can know about built and/or pushed images
+through the [`BUILD_IMAGES`](#build_images-variable) variable.
+
+The default for this variable are the directories named
+[`build-cleanup.d`](./build-cleanup.d/README.md) in the current directory, and
+the directory containing the script.
 
 ### `BUILD_COMPOSE_BIN` Variable
 
@@ -225,9 +244,17 @@ be passed further to out-of-script
 [initialisations](#option--i-and-build_init_dir-variable) to help them locating
 the triggering script, if necessary.
 
-### `BUILD_DOWNLOADER`
+### `BUILD_DOWNLOADER` Variable
 
 Specifies the command used to download release information from GitHub. This
 command should take an additional argument, the URL to download and dump the
 content of the URL to `stdout`. When empty, the default, one of `curl` or
 `wget`, if present, will be used.
+
+### `BUILD_IMAGES` Variable
+
+This variable is computed by the script as it progresses, it cannot be set in
+any way. It is passed further to cleanup programs at the end. The variable
+contains the space-separated list of images that were built, or the list of
+images that were pushed. When images were requested to be built and pushed, only
+the list of pushed images will be present.
