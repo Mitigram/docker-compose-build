@@ -186,8 +186,8 @@ valueof() {
   service "$1" "$2" |
     grep "$3" |
     head -n 1 |
-    sed -E "s/^[[:space:]]+${3}:[[:space:]]+(.*)/\\1/" |
-    sed -E -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+    sed -E "s/^[[:space:]]+${3}:(.*)/\\1/" |
+    sed -E -e 's/^[[:space:]]+//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
 
@@ -273,14 +273,19 @@ docker_build() {
     image=$(image "$1" "${2}")
   fi
 
-  # Pick context and Dockerfile location from the service description, default
-  # to the same as docker-compose defaults.
-  context=$(valueof "$1" 3 "context")
+  context=$(valueof "$1" 2 "build")
   if [ -z "$context" ]; then
-    context=$(dirname "$BUILD_COMPOSE")
-  fi
-  dockerfile=$(valueof "$1" 3 "dockerfile")
-  if [ -z "$dockerfile" ]; then
+    # Pick context and Dockerfile location from the service description, default
+    # to the same as docker-compose defaults.
+    context=$(valueof "$1" 3 "context")
+    if [ -z "$context" ]; then
+      context=$(dirname "$BUILD_COMPOSE")
+    fi
+    dockerfile=$(valueof "$1" 3 "dockerfile")
+    if [ -z "$dockerfile" ]; then
+      dockerfile="Dockerfile"
+    fi
+  else
     dockerfile="Dockerfile"
   fi
 
