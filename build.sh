@@ -61,9 +61,11 @@ BUILD_DRYRUN=${BUILD_DRYRUN:-0}
 BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 
-# Directories to source any initialisation/cleanup scripts from
-BUILD_INIT_DIR=${BUILD_INIT_DIR:-${BUILD_ROOTDIR%/}/build-init.d:$(pwd)/build-init.d}
-BUILD_CLEANUP_DIR=${BUILD_CLEANUP_DIR:-${BUILD_ROOTDIR%/}/build-cleanup.d:$(pwd)/build-cleanup.d}
+# Directories to source any initialisation/cleanup scripts from. When -, the
+# default, this will be the build-init.d (or build-cleanup.d) directories in the
+# same directory than the compose file and the BUILD_ROOTDIR.
+BUILD_INIT_DIR=${BUILD_INIT_DIR:-"-"}
+BUILD_CLEANUP_DIR=${BUILD_CLEANUP_DIR:-"-"}
 
 # Command to use to download stuff. This command should take an additional
 # argument, the URL to download and dump the content of the URL to the stdout.
@@ -279,7 +281,7 @@ docker_build() {
     # to the same as docker-compose defaults.
     context=$(valueof "$1" 3 "context")
     if [ -z "$context" ]; then
-      context=$(dirname "$BUILD_COMPOSE")
+      context=.
     fi
     dockerfile=$(valueof "$1" 3 "dockerfile")
     if [ -z "$dockerfile" ]; then
@@ -304,9 +306,10 @@ docker_build() {
   # Perform build command, we do this in a sub-shell to be able to temporarily
   # change directory.
   if [ "$BUILD_DRYRUN" = "1" ]; then
-    warn "Would run following in $context dir: $buildercmd -t \"$image\" -f \"$dockerfile\" $*"
+    warn "Would run following in $context subdir: $buildercmd -t \"$image\" -f \"$dockerfile\" $*"
   else
-    ( cd "${context}" \
+    ( cd "$(dirname "$BUILD_COMPOSE")" \
+      cd "${context}" \
       && $buildercmd -t "$image" -f "$dockerfile" "$@" . ) 1>&2
 
     # When we won't have to push, the list of images printed on the stdout is the
@@ -403,7 +406,7 @@ execute() {
 #########
 
 # Cannot continue without a docker-compose file
-if ! [ -f "$BUILD_COMPOSE" ]; then
+if [ -z "$BUILD_COMPOSE" ] || ! [ -f "$BUILD_COMPOSE" ]; then
   warn "Cannot find compose file at ${BUILD_COMPOSE}!"
   exit 1
 fi
@@ -459,6 +462,7 @@ fi
 indent=$(grep -E '^\s+' "$BUILD_COMPOSE" |head -n 1|sed -E 's/^(\s+).*/\1/')
 svc_section=$(grep -En '^services' "$BUILD_COMPOSE"|cut -d: -f1)
 
+# Guess command to execute for Web downloads.
 if [ -z "${BUILD_DOWNLOADER:-}" ]; then
   if command -v "curl" >/dev/null 2>&1; then
     BUILD_DOWNLOADER="curl -sSL"
@@ -467,6 +471,17 @@ if [ -z "${BUILD_DOWNLOADER:-}" ]; then
   else
     verbose "Could neither find curl, nor wget. Will not check for new versions"
   fi
+fi
+
+# Initialise init and cleanup directory paths, based on the location of the
+# compose file, when these were the -
+if [ "$BUILD_INIT_DIR" = "-" ]; then
+  BUILD_INIT_DIR=$(dirname "$BUILD_COMPOSE")/build-init.d:${BUILD_ROOTDIR%/}/build-init.d
+  verbose "Automatically set initialisation dir path to: $BUILD_INIT_DIR"
+fi
+if [ "$BUILD_CLEANUP_DIR" = "-" ]; then
+  BUILD_CLEANUP_DIR=$(dirname "$BUILD_COMPOSE")/build-cleanup.d:${BUILD_ROOTDIR%/}/build-cleanup.d
+  verbose "Automatically set cleanup dir path to: $BUILD_CLEANUP_DIR"
 fi
 
 

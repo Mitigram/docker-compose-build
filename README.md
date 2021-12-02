@@ -201,9 +201,10 @@ the script after its initialisation has performed. In other words, variables
 such as [`BUILD_BUILDER`](#option--b-and-build_builder-variable) will reflect
 the builder that is about to be used.
 
-The default for this variable are the directories named
-[`build-init.d`](./build-init.d/README.md) in the current directory, and the
-directory containing the script.
+The default for this variable is the special character `-`. It will
+automatically be resolved to the directory named
+[`build-init.d`](./build-init.d/README.md) in the same directory as the compose
+file, and the directory [containing](#build_rootdir-variable) the script.
 
 ### Option `-c` and `BUILD_CLEANUP_DIR` Variable
 
@@ -217,9 +218,11 @@ actions, similarily to the [`-i`](#option--i-and-build_init_dir-variable)
 option. In addition, cleanup actions can know about built and/or pushed images
 through the [`BUILD_IMAGES`](#build_images-variable) variable.
 
-The default for this variable are the directories named
-[`build-cleanup.d`](./build-cleanup.d/README.md) in the current directory, and
-the directory containing the script.
+The default for this variable is the special character `-`. It will
+automatically be resolved to the directory named
+[`build-cleanup.d`](./build-cleanup.d/README.md) in the same directory as the
+compose file, and the directory [containing](#build_rootdir-variable) the
+script.
 
 ### `BUILD_COMPOSE_BIN` Variable
 
