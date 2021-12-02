@@ -54,6 +54,9 @@ BUILD_AGE=${BUILD_AGE:-1200}
 # Print out more information on stderr
 BUILD_VERBOSE=${BUILD_VERBOSE:-0}
 
+# Perform a dry-run, i.e. don't build, don't push, but show what would be done.
+BUILD_DRYRUN=${BUILD_DRYRUN:-0}
+
 # How to run the docker and docker-compose clients
 BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
@@ -79,7 +82,7 @@ usage() {
   exit "${1:-0}"
 }
 
-while getopts "f:b:s:t:r:a:i:pvh?-" opt; do
+while getopts "f:b:s:t:r:a:i:pnvh?-" opt; do
   case "$opt" in
     f) # Path to docker compose file to use. Defaults to docker-compose.yml in current directory or same directory as script.
       BUILD_COMPOSE=$OPTARG;;
@@ -97,6 +100,8 @@ while getopts "f:b:s:t:r:a:i:pvh?-" opt; do
       BUILD_AGE=$OPTARG;;
     i) # Colon separated list of directories which content will be executed after init, before build
       BUILD_INIT_DIR=$OPTARG;;
+    n) # Just show what would be done instead
+      BUILD_DRYRUN=1;;
     v) # More verbosity on stderr
       BUILD_VERBOSE=1;;
     h | \?) # Print this help and exit
@@ -282,13 +287,17 @@ docker_build() {
 
   # Perform build command, we do this in a sub-shell to be able to temporarily
   # change directory.
-  ( cd "${context}" \
-    && $buildercmd -t "$image" -f "$dockerfile" "$@" . ) 1>&2
+  if [ "$BUILD_DRYRUN" = "1" ]; then
+    warn "Would run following in $context dir: $buildercmd -t \"$image\" -f \"$dockerfile\" $*"
+  else
+    ( cd "${context}" \
+      && $buildercmd -t "$image" -f "$dockerfile" "$@" . ) 1>&2
 
-  # When we won't have to push, the list of images printed on the stdout is the
-  # list of built images. So print the name of the image out.
-  if [ "$BUILD_PUSH" = "0" ]; then
-    printf %s\\n "$image"
+    # When we won't have to push, the list of images printed on the stdout is the
+    # list of built images. So print the name of the image out.
+    if [ "$BUILD_PUSH" = "0" ]; then
+      printf %s\\n "$image"
+    fi
   fi
 }
 
@@ -308,31 +317,38 @@ image_push() {
     image=$(image "$1" "${2}")
   fi
 
-  if service "$1" 2 | grep -q build \
-      && ${BUILD_DOCKER_BIN} image inspect "$image" >/dev/null 2>&1; then
-    # Extract the ISO8601 when the image was last created
-    isodate=$(  ${BUILD_DOCKER_BIN} image inspect "$image" |
-                grep Created |
-                sed -E 's/\s+"Created"\s*:\s*"([^"]+)".*/\1/' )
-    # Convert the ISO8601 date to the number of seconds since the epoch. This
-    # removes the T and remove the milli/microseconds from the date string to
-    # arrange for date -d to be able to parse. Note: On busybox, this will
-    # loose seconds, but this isn't a big deal for us.
-    tstamp=$(date -d "$(printf %s\\n "$isodate"  | sed -E -e 's/([0-9])T([0-9])/\1 \2/' -e 's/\.[0-9]+/ /')" +%s)
-    # Compute how old the image is and push only if it is young, i.e. we've
-    # just built it.
-    now=$(date +%s)
-    age=$(( now - tstamp ))
-    if [ "$age" -lt "$BUILD_AGE" ] || [ "$BUILD_AGE" -le "0" ]; then
-      verbose "Pushing $image to Docker registry"
-      ${BUILD_DOCKER_BIN} push "$image" 1>&2
-      # When we have to push, the list of images printed on the stdout is the
-      # list of pushed images. So print the name of the image out.
-      if [ "$BUILD_PUSH" = "1" ]; then
-        printf %s\\n "$image"
+  if service "$1" 2 | grep -q build; then
+    if [ "$BUILD_DRYRUN" = "1" ]; then
+      if [ "$BUILD_AGE" -le "0" ]; then
+        warn "Would push $image if it existed"
+      else
+        warn "Would push $image if it had been created within $BUILD_AGE seconds"
       fi
-    else
-      warn "$image is too old, last created: $isodate"
+    elif ${BUILD_DOCKER_BIN} image inspect "$image" >/dev/null 2>&1; then
+      # Extract the ISO8601 when the image was last created
+      isodate=$(  ${BUILD_DOCKER_BIN} image inspect "$image" |
+                  grep Created |
+                  sed -E 's/\s+"Created"\s*:\s*"([^"]+)".*/\1/' )
+      # Convert the ISO8601 date to the number of seconds since the epoch. This
+      # removes the T and remove the milli/microseconds from the date string to
+      # arrange for date -d to be able to parse. Note: On busybox, this will
+      # loose seconds, but this isn't a big deal for us.
+      tstamp=$(date -d "$(printf %s\\n "$isodate"  | sed -E -e 's/([0-9])T([0-9])/\1 \2/' -e 's/\.[0-9]+/ /')" +%s)
+      # Compute how old the image is and push only if it is young, i.e. we've
+      # just built it.
+      now=$(date +%s)
+      age=$(( now - tstamp ))
+      if [ "$age" -lt "$BUILD_AGE" ] || [ "$BUILD_AGE" -le "0" ]; then
+        verbose "Pushing $image to Docker registry"
+        ${BUILD_DOCKER_BIN} push "$image" 1>&2
+        # When we have to push, the list of images printed on the stdout is the
+        # list of pushed images. So print the name of the image out.
+        if [ "$BUILD_PUSH" = "1" ]; then
+          printf %s\\n "$image"
+        fi
+      else
+        warn "$image is too old, last created: $isodate"
+      fi
     fi
   fi
 }
@@ -428,8 +444,12 @@ do
   if [ -d "$dir" ]; then
     find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
       sort | while IFS= read -r initfile; do
-        warn "Loading initialisation file at $initfile"
-        "$initfile"
+        if [ "$BUILD_DRYRUN" = "1" ]; then
+          warn "Would load initialisation file at $initfile"
+        else
+          warn "Loading initialisation file at $initfile"
+          "$initfile"
+        fi
       done
   fi
 done
@@ -460,21 +480,29 @@ case "$BUILD_BUILDER" in
     # file. So we just run docker-compose build, for all or just the services
     # specified.
     if [ -z "$BUILD_SERVICES" ]; then
-      image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" |
-                tee -a "$fifo" |
-                grep "Successfully tagged" |
-                sed -E 's/^Successfully tagged\s+(.*)/\1/')
-      if [ "$BUILD_PUSH" = "0" ]; then
-        printf %s\\n "$image"
-      fi
-    else
-      for svc in $BUILD_SERVICES; do
-        image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" -- "$svc" |
+      if [ "$BUILD_DRYRUN" = "1" ]; then
+        warn "Would run: ${BUILD_COMPOSE_BIN} -f \"$BUILD_COMPOSE\" build $*"
+      else
+        image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" |
                   tee -a "$fifo" |
                   grep "Successfully tagged" |
                   sed -E 's/^Successfully tagged\s+(.*)/\1/')
         if [ "$BUILD_PUSH" = "0" ]; then
           printf %s\\n "$image"
+        fi
+      fi
+    else
+      for svc in $BUILD_SERVICES; do
+        if [ "$BUILD_DRYRUN" = "1" ]; then
+          warn "Would run: ${BUILD_COMPOSE_BIN} -f \"$BUILD_COMPOSE\" build $* -- \"$svc\""
+        else
+          image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" -- "$svc" |
+                    tee -a "$fifo" |
+                    grep "Successfully tagged" |
+                    sed -E 's/^Successfully tagged\s+(.*)/\1/')
+          if [ "$BUILD_PUSH" = "0" ]; then
+            printf %s\\n "$image"
+          fi
         fi
       done
     fi
@@ -497,13 +525,17 @@ case "$BUILD_BUILDER" in
               docker_build "$svc" "$tag" "$@"
               main=$tag
             else
-              verbose "Re-tagging image from service $svc, tag: $tag"
-              $BUILD_DOCKER_BIN image tag \
-                "$(image "$svc" "$main")" \
-                "$(image "$svc" "$tag")" 1>&2
+              if [ "$BUILD_DRYRUN" = "1" ]; then
+                warn "Would re-tag $(image "$svc" "$main") to $(image "$svc" "$tag")"
+              else
+                verbose "Re-tagging image from service $svc, tag: $tag"
+                $BUILD_DOCKER_BIN image tag \
+                  "$(image "$svc" "$main")" \
+                  "$(image "$svc" "$tag")" 1>&2
 
-              if [ "$BUILD_PUSH" = "0" ]; then
-                printf %s\\n "$(image "$svc" "$tag")"
+                if [ "$BUILD_PUSH" = "0" ]; then
+                  printf %s\\n "$(image "$svc" "$tag")"
+                fi
               fi
             fi
           done
@@ -543,11 +575,13 @@ fi
 # STEP 5: Check for New Versions
 #########
 if [ -n "$BUILD_DOWNLOADER" ]; then
+  verbose "Checking latest version of project $BUILD_GH_PROJECT at GitHub"
   # Pick the latest release out of the HTML for the releases description. This
   # avoids the GitHub API on purpose to avoid being rate-limited.
   release=$(  $BUILD_DOWNLOADER "https://github.com/${BUILD_GH_PROJECT}/releases" |
               grep -Eo "href=\"/${BUILD_GH_PROJECT}/releases/tag/v?[0-9]+(\\.[0-9]+){1,2}\"" |
               grep -v no-underline |
+              sort -r |
               head -n 1 |
               cut -d '"' -f 2 |
               awk '{n=split($NF,a,"/");print a[n]}' |
