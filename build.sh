@@ -285,10 +285,22 @@ docker_build() {
     fi
     dockerfile=$(valueof "$1" 3 "dockerfile")
     if [ -z "$dockerfile" ]; then
-      dockerfile="Dockerfile"
+      dockerfile=$( find "$(dirname "$BUILD_COMPOSE")/${context}" \
+                      -mindepth 1 -maxdepth 1 -iname Dockerfile |
+                    head -n 1)
+      if [ -n "$dockerfile" ]; then dockerfile=$(basename -- "$dockerfile"); fi
     fi
   else
-    dockerfile="Dockerfile"
+    dockerfile=$( find "$(dirname "$BUILD_COMPOSE")/${context}" \
+                    -mindepth 1 -maxdepth 1 -iname Dockerfile |
+                  head -n 1)
+    if [ -n "$dockerfile" ]; then dockerfile=$(basename -- "$dockerfile"); fi
+  fi
+
+  # Give up building if we don't have a Dockerfile set
+  if [ -z "$dockerfile" ]; then
+    warn "Cannot find default Dockerfile in $(dirname "$BUILD_COMPOSE")/${context}!"
+    return 0
   fi
 
   # Done with the two first arguments, everything else will be passed further to
@@ -500,7 +512,9 @@ done
 # separated list of directories passed as BUILD_INIT_DIR.
 execute "$BUILD_INIT_DIR" "initialisation"
 
+# Initialise set of built/pushed images
 BUILD_IMAGES=
+
 
 #########
 # STEP 3: Build Images
