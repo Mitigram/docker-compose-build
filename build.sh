@@ -115,7 +115,7 @@ done
 shift $((OPTIND-1))
 
 # Poor man's logging
-_message() { printf '[%s] [%s] %s\n' "$(date +'%Y%m%d-%H%M%S')" "${1:-DBG}" "$2" >&2; }
+_message() { printf '[%s] [%s] [%s] %s\n' "$(basename -- "$0")" "${1:-DBG}" "$(date +'%Y%m%d-%H%M%S')" "$2" >&2; }
 verbose() {
   if [ "$BUILD_VERBOSE" = "1" ]; then
     _message "NFO" "$1"
