@@ -108,7 +108,14 @@ Provide quick usage summary at the terminal and exit.
 ### Flag `-v` and `BUILD_VERBOSE` Variable
 
 When the flag is given or the variable set to `1`, the script will describe the
-various steps that it performs more verbosedly on the stderr.
+various steps that it performs more verbosedly on the `stderr`.
+
+### Flag `-n` and `BUILD_DRYRUN` Variable
+
+When the flag is given or the variable set to `1`, the script will only describe
+the various steps that it would perform on the `stderr`, but not actually do
+anything. No image name will be printed out on the `stdout`, as no image was
+built or pushed.
 
 ### Flag `-p` and `BUILD_PUSH` Variable
 
