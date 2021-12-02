@@ -448,7 +448,7 @@ esac
 
 # Resolve auto to the best available of docker buildx or old-style docker.
 if [ "$BUILD_BUILDER" = "auto" ]; then
-  if ${BUILD_DOCKER_BIN} buildx >/dev/null; then
+  if ${BUILD_DOCKER_BIN} buildx >/dev/null 2>&1; then
     verbose "Using buildx for building image(s)"
     BUILD_BUILDER=buildx
   else
