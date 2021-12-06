@@ -13,8 +13,14 @@ BUILD_ROOTDIR=${BUILD_ROOTDIR:-"$( cd -P -- "$(dirname -- "$(command -v -- "$0")
 
 # Look for $2 in colon separated path-like in $1
 pathfind() {
-  printf %s\\n "$1"|sed 's/:/\n/g'|grep -vE '^$'|while IFS= read -r dir; do
-    find "$dir" -mindepth 1 -maxdepth 1 -name "$2" 2>/dev/null
+  # shellcheck disable=SC3043
+  local _paths _name || true
+
+  _paths=$1; shift
+  printf %s\\n "$_paths"|sed 's/:/\n/g'|grep -vE '^$'|while IFS= read -r dir; do
+    for _name in "$@"; do
+      find "$dir" -mindepth 1 -maxdepth 1 -name "$_name" 2>/dev/null
+    done
   done | head -n 1
 }
 
@@ -23,7 +29,7 @@ BUILD_VERSION=1.4.1
 
 # The location of the compose file. This file contains information about the
 # images to generate.
-BUILD_COMPOSE=${BUILD_COMPOSE:-$(pathfind "$(pwd):${BUILD_ROOTDIR%/}" docker-compose.yml)}
+BUILD_COMPOSE=${BUILD_COMPOSE:-$(pathfind "$(pwd):${BUILD_ROOTDIR%/}" compose.yaml compose.yml docker-compose.yaml docker-compose.yml)}
 
 # The list of services to build/push for. When empty, this will be a good guess
 # of all services (the guess is perfect when building with compose).
