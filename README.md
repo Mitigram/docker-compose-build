@@ -1,9 +1,9 @@
 # docker-compose-build
 
 Using `docker-compose` in dev, but a more complex orchestrator in production?
-This script uses the `docker-compose.yml` file to capture building information
-for your images, but can help out when pushing to several registries or tagging
-them with a release number (from a GitHub workflow?), for example. The script
+This script uses the (Docker) [compose] file to capture building information for
+your images, but can help out when pushing to several registries or tagging them
+with a release number (from a GitHub workflow?), for example. The script
 supplements and/or replaces `docker compose build` with `docker build` in order
 to:
 
@@ -22,9 +22,9 @@ to:
 
 This script has sane defaults. If `docker-compose` is installed, its default
 behaviour is to build all or some of the services that are pointed at by the
-`docker-compose.yml` file in the current directory. When operations such as
+(Docker) [compose] file in the current directory. When operations such as
 pushing, retagging or changing the destination registry are requested, the
-script will actively read the content of the `docker-compose.yml` and pick the
+script will actively read the content of the compose file and pick the
 necessary information from there. At the time of writing, this will work best
 when the `services` section is last in the file.
 
@@ -39,6 +39,7 @@ of the script. The script will automatically check if there are new versions
 available once all build and push operations have finished. It will print a
 warning when a new version is available.
 
+  [compose]: https://compose-spec.io/
   [submodule]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
   [subtree]: https://git-memo.readthedocs.io/en/latest/subtree.html
 
@@ -124,9 +125,14 @@ built or pushed.
 
 ### Option `-f` and `BUILD_COMPOSE` Variable
 
-Specifies the location of the compose file to use. The default is to look for a
-file called `docker-compose.yml` first in the current directory, then in the
-same directory as the script is located at.
+Specifies the location of the compose file to use. The default is to look for
+the following files, in that order, first in the current directory, then in the
+same directory as the script is located at:
+
+1. `compose.yaml`
+2. `compose.yml`
+3. `docker-compose.yaml`
+4. `docker-compose.yml`
 
 ### Flag `-p` and `BUILD_PUSH` Variable
 
@@ -261,3 +267,15 @@ any way. It is passed further to cleanup programs at the end. The variable
 contains the space-separated list of images that were built, or the list of
 images that were pushed. When images were requested to be built and pushed, only
 the list of pushed images will be present.
+
+## Future
+
+As [build] has become an optional part of the [compose] specification, this
+script could provide a replacement for `docker-compose build` (or the coming
+`docker compose build`), if ever this functionality was removed (?!). In its
+current shape, the tool only supports the most common build options, i.e.
+[context] and [dockerfile].
+
+  [build]: https://github.com/compose-spec/compose-spec/blob/master/build.md
+  [context]: https://github.com/compose-spec/compose-spec/blob/master/build.md#context-required
+  [dockerfile]: https://github.com/compose-spec/compose-spec/blob/master/build.md#dockerfile
