@@ -1,11 +1,12 @@
 # docker-compose-build
 
 Using `docker-compose` in dev, but a more complex orchestrator in production?
-This script uses the (Docker) [compose] file to capture building information for
-your images, but can help out when pushing to several registries or tagging them
-with a release number (from a GitHub workflow?), for example. The script
-supplements and/or replaces `docker compose build` with `docker build` in order
-to:
+This [script](#command-line-and-environment-configuration) (and GitHub
+[action](#github-action)) uses the (Docker) [compose] file to capture building
+information for your images, but can help out when pushing to several registries
+or tagging them with a release number (from a GitHub workflow?), for example.
+The script supplements and/or replaces `docker compose build` with `docker
+build` in order to:
 
 + [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
   registries.
@@ -268,6 +269,29 @@ any way. It is passed further to cleanup programs at the end. The variable
 contains the space-separated list of images that were built, or the list of
 images that were pushed. When images were requested to be built and pushed, only
 the list of pushed images will be present.
+
+## GitHub Action
+
+The script doubles as a GitHub Action, use it in a workflow as exemplified
+below, provided you have access to `docker`. For a complete list of inputs and
+their usage, consult the [`action.yml`](./action.yml) file.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and Push
+        uses: Mitigram/docker-compose-build@main
+        with:
+          compose: <path-to-compose.yml>
+```
+
+Note that by default, the action attempts to make all the binaries available at
+their standard location under the extraction directory at the `PATH`. In other
+words, the default behaviour of the action is to leverage the behaviour of the
+[`-e`](#flag--e) flag. You can turn off this behaviour by setting the input
+called `path` to the string `"false"`.
 
 ## Future
 
