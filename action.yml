@@ -120,7 +120,7 @@ runs:
       name: Build
       id: build
       shell: bash
-      if: ! inputs.push
+      if: ${{ ! inputs.push }}
       # Action syntax forces either version, or tag from `use`, so disable
       # download check.
       env:
@@ -139,7 +139,7 @@ runs:
       name: Build and Push
       id: push
       shell: bash
-      if: inputs.push
+      if: ${{ inputs.push }}
       # Action syntax forces either version, or tag from `use`, so disable
       # download check.
       env:
