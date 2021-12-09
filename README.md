@@ -231,6 +231,16 @@ automatically be resolved to the directory named
 compose file, and the directory [containing](#build_rootdir-variable) the
 script.
 
+### Option `-g` and `BUILD_IGNORE` Variable
+
+Specifies a glob pattern. Executable files from the
+[init](#option--i-and-build_init_dir-variable) and
+[cleanup](#option--c-and-build_cleanup_dir-variable) directories, which basename
+match the pattern will not be executed. The default is to ignore MarkDown files
+as these would otherwise be deemed executables when running with [WSL].
+
+  [WSL]: https://docs.microsoft.com/en-us/windows/wsl/install
+
 ### `BUILD_COMPOSE_BIN` Variable
 
 Specifies how to run `docker-compose`, which also is the default value.
