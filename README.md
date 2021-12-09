@@ -1,11 +1,12 @@
 # docker-compose-build
 
 Using `docker-compose` in dev, but a more complex orchestrator in production?
-This script uses the (Docker) [compose] file to capture building information for
-your images, but can help out when pushing to several registries or tagging them
-with a release number (from a GitHub workflow?), for example. The script
-supplements and/or replaces `docker compose build` with `docker build` in order
-to:
+This [script](#command-line-and-environment-configuration) (and GitHub
+[action](#github-action)) uses the (Docker) [compose] file to capture building
+information for your images, but can help out when pushing to several registries
+or tagging them with a release number (from a GitHub workflow?), for example.
+The script supplements and/or replaces `docker compose build` with
+`docker build` in order to:
 
 + [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
   registries.
@@ -180,7 +181,7 @@ the compose file will be picked up and used, if any.
 
 ### Option `-r` and `BUILD_REGISTRY` Variable
 
-Specified an alternative registry to use instead of the one specified as part of
+Specifies an alternative registry to use instead of the one specified as part of
 the compose file. When no registry is given, the default, the registry will be
 the one from the compose file.
 
@@ -255,10 +256,11 @@ the triggering script, if necessary.
 
 ### `BUILD_DOWNLOADER` Variable
 
-Specifies the command used to download release information from GitHub. This
-command should take an additional argument, the URL to download and dump the
-content of the URL to `stdout`. When empty, the default, one of `curl` or
-`wget`, if present, will be used.
+Specifies the command used to download release information from GitHub. When run
+the command specified in this variable will be given an additional argument, the
+URL to download and it should dump the content of the URL to `stdout` as a
+result. When empty, the default, one of `curl` or `wget`, if present, will be
+used. When a dash `-`, version checks will be skipped.
 
 ### `BUILD_IMAGES` Variable
 
@@ -267,6 +269,29 @@ any way. It is passed further to cleanup programs at the end. The variable
 contains the space-separated list of images that were built, or the list of
 images that were pushed. When images were requested to be built and pushed, only
 the list of pushed images will be present.
+
+## GitHub Action
+
+The script doubles as a GitHub Action, use it in a workflow as exemplified
+below, provided you have access to `docker`. For a complete list of inputs and
+their usage, consult the [`action.yml`](./action.yml) file.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and Push
+        uses: Mitigram/docker-compose-build@main
+        with:
+          compose: <path-to-compose.yml>
+```
+
+Note that by default, the action attempts to make all the binaries available at
+their standard location under the extraction directory at the `PATH`. In other
+words, the default behaviour of the action is to leverage the behaviour of the
+[`-e`](#flag--e) flag. You can turn off this behaviour by setting the input
+called `path` to the string `"false"`.
 
 ## Future
 

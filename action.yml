@@ -1,0 +1,158 @@
+name: Compose Build
+description: |
+  Build from compose file, with additional features such as changing destination
+  registry or tag, or run pre-build and/or post-push hooks.
+author: Emmanuel Frecon <emmanuel.frecon@mitigram.com>
+branding:
+  icon: layers
+  color: green
+
+inputs:
+  compose:
+    description: Path to the compose file
+    required: true
+
+  push:
+    description: |
+      When true, images specified by the compose file will also be pushed to
+      their respective registries, once building has finished. The `docker`
+      client used in the workflow must have enough credentials to access the
+      remote registries. Old images will automatically be skipped (see input
+      `age`)
+    required: false
+    default: "true"
+
+  builder:
+    description: |
+      Specifies the builder to use, can be one of:
+
+      + `compose` (the default): will try hard to use compose, but will revert
+        to the `auto` builder (see below) when `docker-compose` is not
+        installed.
+      + `auto`: will pick the best of the new `buildx` or old-style `docker
+        build`, depending on which is available, and in that order, i.e.
+        `buildx` preferred.
+      + `buildx`: will use the new `buildx` for building. This requires the
+        `buildx` Docker plugin to be available and properly installed.
+      + `docker` or `build`: will use the old-style `docker build` command.
+    required: false
+    default: compose
+
+  services:
+    description: |
+      Specifies the space separated list of services to build. These services
+      need to exist in the compose file. When empty, the default, the action
+      will default to building/pushing all the services specified in the compose
+      file.
+    required: false
+
+  tags:
+    description: |
+      Specifies the space separated list of tags to give to the images that will
+      be built/pushed. When building, the image with the first tag in the list
+      will be built, while images with the other tags will be tagged with the
+      first image as the source. The default is to not specified any tag, in
+      which case the tag from the compose file will be picked up and used, if
+      any.
+    required: false
+
+  registry:
+    description: |
+      Specifies an alternative registry to use instead of the one specified as
+      part of the compose file. When no registry is given, the default, the
+      registry will be the one from the compose file.
+    required: false
+
+  age:
+    description: |
+      Specifies the maximum age (in seconds) of the image since creation to
+      decide whether it should be pushed or not. This is a safety measure to
+      avoid pushing junk images have not been changed during build. The default
+      of `1200` seconds should work in most cases, but any negative value will
+      turn this check off, meaning that all relevant images will be pushed,
+      disregarding their age.
+    required: false
+    default: "1200"
+
+  init:
+    description: |
+      Specifies a list of directory paths, separated by the colon `:` sign
+      wherefrom to find and execute initialisation actions. All exectuable
+      (scripts or programs) in these directories will automatically be executed
+      once the action initialisation has ended and before build and push
+      operations are about to start. See main README.md for more information
+    required: false
+    default: "-"
+
+  cleanup:
+    description: |
+      Specifies a list of directory paths, separated by the colon `:` sign
+      wherefrom to find and execute cleanup actions. All exectuable (scripts or
+      programs) in these directories will automatically be executed once images
+      have been built and pushed. See main README.md for more information
+    required: false
+    default: "-"
+
+  options:
+    description: |
+      Additional options to build implementation script, e.g. -v to print out
+      additional verbose information. This is a semi-internal input and should
+      only be used for debugging. If led by a double-dash, the value to this
+      input can be used to pass further option to the build commands, e.g.
+      `-- --no-cache`.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Make sure that we have all the binaries necessary to run the image, we
+    # need at least a Docker CLI client (even though this isn't **strictly**
+    # necessary, e.g. nerdctl, but out of the scope of the action)
+    -
+      name: Check binary Dependencies
+      id: dependencies
+      uses: Mitigram/gh-action-dependency-check@main
+      with:
+        dependencies: |
+          docker
+    -
+      name: Build
+      id: build
+      shell: bash
+      if: ! inputs.push
+      # Action syntax forces either version, or tag from `use`, so disable
+      # download check.
+      env:
+        BUILD_DOWNLOADER: "-"
+      run: |
+        ${{ github.action_path }}/build.sh \
+          -f '${{ inputs.compose }}' \
+          -b '${{ inputs.builder }}' \
+          -s '${{ inputs.services }}' \
+          -t '${{ inputs.tags }}' \
+          -r '${{ inputs.registry }}' \
+          -i '${{ inputs.init }}' \
+          -c '${{ inputs.cleanup }}' \
+          ${{ inputs.options }}
+    -
+      name: Build and Push
+      id: push
+      shell: bash
+      if: inputs.push
+      # Action syntax forces either version, or tag from `use`, so disable
+      # download check.
+      env:
+        BUILD_DOWNLOADER: "-"
+      run: |
+        ${{ github.action_path }}/build.sh \
+          -f '${{ inputs.compose }}' \
+          -b '${{ inputs.builder }}' \
+          -s '${{ inputs.services }}' \
+          -t '${{ inputs.tags }}' \
+          -r '${{ inputs.registry }}' \
+          -i '${{ inputs.init }}' \
+          -c '${{ inputs.cleanup }}' \
+          -a '${{ inputs.age }}' \
+          -p \
+          ${{ inputs.options }}
