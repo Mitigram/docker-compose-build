@@ -236,7 +236,7 @@ script.
 Specifies a glob pattern. Executable files from the
 [init](#option--i-and-build_init_dir-variable) and
 [cleanup](#option--c-and-build_cleanup_dir-variable) directories, which basename
-match the pattern will not be executed. The default is to ignore MarkDown files
+match the pattern will not be executed. The default is to ignore Markdown files
 as these would otherwise be deemed executables when running with [WSL].
 
   [WSL]: https://docs.microsoft.com/en-us/windows/wsl/install
