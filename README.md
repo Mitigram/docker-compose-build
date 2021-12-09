@@ -5,8 +5,8 @@ This [script](#command-line-and-environment-configuration) (and GitHub
 [action](#github-action)) uses the (Docker) [compose] file to capture building
 information for your images, but can help out when pushing to several registries
 or tagging them with a release number (from a GitHub workflow?), for example.
-The script supplements and/or replaces `docker compose build` with `docker
-build` in order to:
+The script supplements and/or replaces `docker compose build` with
+`docker build` in order to:
 
 + [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
   registries.
