@@ -73,6 +73,12 @@ BUILD_COMPOSE_BIN=${BUILD_COMPOSE_BIN:-"docker-compose"}
 BUILD_INIT_DIR=${BUILD_INIT_DIR:-"-"}
 BUILD_CLEANUP_DIR=${BUILD_CLEANUP_DIR:-"-"}
 
+# Executable files matching this and found in the init and cleanup directories
+# will be ignored (this is a wrong-but-usable fix against Windows mounting text
+# files with the exec. flag by default). Test will be performed on the basename
+# of the path.
+BUILD_IGNORE=${BUILD_IGNORE:-'*.md'}
+
 # Command to use to download stuff. This command should take an additional
 # argument, the URL to download and dump the content of the URL to the stdout.
 # When empty, the default, one of curl or wget, if present, will be used. When a
@@ -93,7 +99,7 @@ usage() {
 }
 
 # Use standard getops. Options first, then flags, in alphabetical order
-while getopts "a:b:c:f:i:r:s:t:hnpv?-" opt; do
+while getopts "a:b:c:g:f:i:r:s:t:hnpv?-" opt; do
   # The order of this case statement is used for printing out the usage
   # description. So, rather than having it in the same order as the getopts
   # string spec. above, the options and flags are arranged in order of priority:
@@ -115,6 +121,8 @@ while getopts "a:b:c:f:i:r:s:t:hnpv?-" opt; do
       BUILD_INIT_DIR=$OPTARG;;
     c) # Colon separated list of directories which content will be executed once all images built and pushed
       BUILD_CLEANUP_DIR=$OPTARG;;
+    g) # Glob-pattern to ignore some files from the init and cleanup directories.
+      BUILD_IGNORE=$OPTARG;;
     a) # Maximum age of the image when pushing, older will be discarded. Negative to turn off.
       BUILD_AGE=$OPTARG;;
     n) # Just show what would be done instead
@@ -142,6 +150,62 @@ verbose() {
   fi
 }
 warn() { _message "WRN" "$1"; }
+
+
+# Performs word splitting on "$2" (the separator)
+split() {
+  # shellcheck disable=SC3043
+  local _oldstate || true
+
+  [ -z "$2" ] && echo "$1" && return
+
+  # Disable globbing. This ensures that the word-splitting is safe.
+  _oldstate=$(set +o); set -f
+
+  # Store the current value of 'IFS' so we can restore it later.
+  old_ifs=$IFS
+
+  # Change the field separator to what we're splitting on.
+  IFS=$2
+
+  # Create an argument list splitting at each occurance of '$2'.
+  #
+  # This is safe to disable as it just warns against word-splitting which is the
+  # behavior we expect.
+  # shellcheck disable=2086
+  set -- $1
+
+  # Print each list value on its own line.
+  printf '%s\n' "$@"
+
+  # Restore the value of 'IFS'.
+  IFS=$old_ifs
+
+  # Restore globbing state
+  set +vx; eval "$_oldstate"
+}
+
+
+# Performs glob matching with explicit support for |, which otherwise is outside
+# POSIX. See:
+# https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13
+# $1 is the matching pattern
+# $2 is the string to test against
+glob() {
+  # shellcheck disable=SC3043
+  local _oldstate || true
+
+  # Disable globbing. This ensures that the case is not globbed.
+  _oldstate=$(set +o); set -f
+  for ptn in $(split "$1" "|"); do
+      # shellcheck disable=2254
+      case "$2" in
+          $ptn) set +vx; eval "$_oldstate"; return 0;;
+      esac
+  done
+  set +vx; eval "$_oldstate"
+  return 1
+}
 
 
 # Without a 2nd argument, this function will return the entire definition of the
@@ -408,11 +472,15 @@ execute() {
       verbose "Executing all executable files directly under '$dir', in alphabetical order"
       find -L "$dir" -maxdepth 1 -mindepth 1 -name '*' -type f -executable |
         sort | while IFS= read -r initfile; do
-          if [ "$BUILD_DRYRUN" = "1" ]; then
-            warn "Would load $2 file at $initfile"
+          if glob "$BUILD_IGNORE" "$(basename "$initfile")"; then
+            warn "Ignoring file $initfile, matches '$BUILD_IGNORE'"
           else
-            warn "Loading $2 file at $initfile"
-            "$initfile"
+            if [ "$BUILD_DRYRUN" = "1" ]; then
+              warn "Would load $2 file at $initfile"
+            else
+              warn "Loading $2 file at $initfile"
+              "$initfile"
+            fi
           fi
         done
     fi
