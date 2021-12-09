@@ -75,7 +75,8 @@ BUILD_CLEANUP_DIR=${BUILD_CLEANUP_DIR:-"-"}
 
 # Command to use to download stuff. This command should take an additional
 # argument, the URL to download and dump the content of the URL to the stdout.
-# When empty, the default, one of curl or wget, if present, will be used.
+# When empty, the default, one of curl or wget, if present, will be used. When a
+# dash, version check will be disabled.
 BUILD_DOWNLOADER=${BUILD_DOWNLOADER:-}
 
 # Name of the project at GitHub, there is is little point in changing this...
@@ -660,7 +661,7 @@ execute "$BUILD_CLEANUP_DIR" "cleanup"
 #########
 # STEP 6: Check for New Versions
 #########
-if [ -n "$BUILD_DOWNLOADER" ]; then
+if [ -n "$BUILD_DOWNLOADER" ] && [ "$BUILD_DOWNLOADER" != "-" ]; then
   verbose "Checking latest version of project $BUILD_GH_PROJECT at GitHub"
   # Pick the latest release out of the HTML for the releases description. This
   # avoids the GitHub API on purpose to avoid being rate-limited.

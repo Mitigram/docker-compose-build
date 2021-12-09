@@ -180,7 +180,7 @@ the compose file will be picked up and used, if any.
 
 ### Option `-r` and `BUILD_REGISTRY` Variable
 
-Specified an alternative registry to use instead of the one specified as part of
+Specifies an alternative registry to use instead of the one specified as part of
 the compose file. When no registry is given, the default, the registry will be
 the one from the compose file.
 
@@ -255,10 +255,11 @@ the triggering script, if necessary.
 
 ### `BUILD_DOWNLOADER` Variable
 
-Specifies the command used to download release information from GitHub. This
-command should take an additional argument, the URL to download and dump the
-content of the URL to `stdout`. When empty, the default, one of `curl` or
-`wget`, if present, will be used.
+Specifies the command used to download release information from GitHub. When run
+the command specified in this variable will be given an additional argument, the
+URL to download and it should dump the content of the URL to `stdout` as a
+result. When empty, the default, one of `curl` or `wget`, if present, will be
+used. When a dash `-`, version checks will be skipped.
 
 ### `BUILD_IMAGES` Variable
 
