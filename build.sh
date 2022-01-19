@@ -25,7 +25,7 @@ pathfind() {
 }
 
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.5.0
+BUILD_VERSION=1.5.1
 
 # The location of the compose file. This file contains information about the
 # images to generate.
@@ -347,7 +347,7 @@ docker_build() {
   fi
 
   context=$(valueof "$1" 2 "build")
-  if [ -z "$context" ]; then
+  if [ -n "$context" ]; then
     # Pick context and Dockerfile location from the service description, default
     # to the same as docker-compose defaults.
     context=$(valueof "$1" 3 "context")
