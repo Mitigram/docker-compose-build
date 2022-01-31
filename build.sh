@@ -142,10 +142,22 @@ done
 # docker-compose build or docker build (depending on the chosen builder).
 shift $((OPTIND-1))
 
+# Booleans
+to_lower() { printf %s\\n "$1" | tr '[:upper]' '[:lower:]'; }
+is_true() {
+    [ "$1" != "0" ] \
+    || [ "$(to_lower "$1")" = "true" ] \
+    || [ "$(to_lower "$1")" = "on" ] \
+    || [ "$(to_lower "$1")" = "yes" ]; }
+is_false() {
+    [ "$1" = "0" ] \
+    || [ "$(to_lower "$1")" = "false" ] \
+    || [ "$(to_lower "$1")" = "off" ] \
+    || [ "$(to_lower "$1")" = "no" ]; }
 # Poor man's logging
 _message() { printf '[%s] [%s] [%s] %s\n' "$(basename -- "$0")" "${1:-DBG}" "$(date +'%Y%m%d-%H%M%S')" "$2" >&2; }
 verbose() {
-  if [ "$BUILD_VERBOSE" = "1" ]; then
+  if is_true "$BUILD_VERBOSE"; then
     _message "NFO" "$1"
   fi
 }
@@ -388,7 +400,7 @@ docker_build() {
 
   # Perform build command, we do this in a sub-shell to be able to temporarily
   # change directory.
-  if [ "$BUILD_DRYRUN" = "1" ]; then
+  if is_true "$BUILD_DRYRUN"; then
     warn "Would run following in $context subdir: $buildercmd -t \"$image\" -f \"$dockerfile\" $*"
   else
     ( cd "$(dirname "$BUILD_COMPOSE")" \
@@ -397,7 +409,7 @@ docker_build() {
 
     # When we won't have to push, the list of images printed on the stdout is the
     # list of built images. So print the name of the image out.
-    if [ "$BUILD_PUSH" = "0" ]; then
+    if is_false "$BUILD_PUSH"; then
       BUILD_IMAGES="$BUILD_IMAGES $image"
       printf %s\\n "$image"
     fi
@@ -422,7 +434,7 @@ image_push() {
   fi
 
   if service "$1" 2 | grep -q build; then
-    if [ "$BUILD_DRYRUN" = "1" ]; then
+    if is_true "$BUILD_DRYRUN"; then
       if [ "$BUILD_AGE" -le "0" ]; then
         warn "Would push $image if it existed"
       else
@@ -447,7 +459,7 @@ image_push() {
         ${BUILD_DOCKER_BIN} push "$image" 1>&2
         # When we have to push, the list of images printed on the stdout is the
         # list of pushed images. So print the name of the image out.
-        if [ "$BUILD_PUSH" = "1" ]; then
+        if is_true "$BUILD_PUSH"; then
           BUILD_IMAGES="$BUILD_IMAGES $image"
           printf %s\\n "$image"
         fi
@@ -475,7 +487,7 @@ execute() {
           if glob "$BUILD_IGNORE" "$(basename "$initfile")"; then
             warn "Ignoring file $initfile, matches '$BUILD_IGNORE'"
           else
-            if [ "$BUILD_DRYRUN" = "1" ]; then
+            if is_true "$BUILD_DRYRUN"; then
               warn "Would load $2 file at $initfile"
             else
               warn "Loading $2 file at $initfile"
@@ -618,28 +630,28 @@ case "$BUILD_BUILDER" in
     # file. So we just run docker-compose build, for all or just the services
     # specified.
     if [ -z "$BUILD_SERVICES" ]; then
-      if [ "$BUILD_DRYRUN" = "1" ]; then
+      if is_true "$BUILD_DRYRUN"; then
         warn "Would run: ${BUILD_COMPOSE_BIN} -f \"$BUILD_COMPOSE\" build $*"
       else
         image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" |
                   tee -a "$fifo" |
                   grep "Successfully tagged" |
                   sed -E 's/^Successfully tagged\s+(.*)/\1/')
-        if [ "$BUILD_PUSH" = "0" ]; then
+        if is_false "$BUILD_PUSH"; then
           BUILD_IMAGES="$BUILD_IMAGES $image"
           printf %s\\n "$image"
         fi
       fi
     else
       for svc in $BUILD_SERVICES; do
-        if [ "$BUILD_DRYRUN" = "1" ]; then
+        if is_true "$BUILD_DRYRUN"; then
           warn "Would run: ${BUILD_COMPOSE_BIN} -f \"$BUILD_COMPOSE\" build $* -- \"$svc\""
         else
           image=$(  ${BUILD_COMPOSE_BIN} -f "$BUILD_COMPOSE" build "$@" -- "$svc" |
                     tee -a "$fifo" |
                     grep "Successfully tagged" |
                     sed -E 's/^Successfully tagged\s+(.*)/\1/')
-          if [ "$BUILD_PUSH" = "0" ]; then
+          if is_false "$BUILD_PUSH"; then
             BUILD_IMAGES="$BUILD_IMAGES $image"
             printf %s\\n "$image"
           fi
@@ -665,7 +677,7 @@ case "$BUILD_BUILDER" in
               docker_build "$svc" "$tag" "$@"
               main=$tag
             else
-              if [ "$BUILD_DRYRUN" = "1" ]; then
+              if is_true "$BUILD_DRYRUN"; then
                 warn "Would re-tag $(image "$svc" "$main") to $(image "$svc" "$tag")"
               else
                 verbose "Re-tagging image from service $svc, tag: $tag"
@@ -673,7 +685,7 @@ case "$BUILD_BUILDER" in
                   "$(image "$svc" "$main")" \
                   "$(image "$svc" "$tag")" 1>&2
 
-                if [ "$BUILD_PUSH" = "0" ]; then
+                if is_false "$BUILD_PUSH"; then
                   BUILD_IMAGES="$BUILD_IMAGES $(image "$svc" "$tag")"
                   printf %s\\n "$(image "$svc" "$tag")"
                 fi
@@ -694,7 +706,7 @@ esac
 #########
 
 # Push if requested
-if [ "$BUILD_PUSH" = "1" ]; then
+if is_true "$BUILD_PUSH"; then
   # Detect list of services to build
   if [ -z "$BUILD_SERVICES" ]; then
     BUILD_SERVICES=$(services)
