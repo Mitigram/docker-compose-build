@@ -18,6 +18,7 @@ jobs:
         name: Test
         uses: ./
         with:
+          compose: ./example/docker-compose.yml
           tags: "test latest"
           age: "0"
           init: ./example/init.d
