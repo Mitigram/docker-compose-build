@@ -23,3 +23,4 @@ jobs:
           age: "0"
           init: ./example/init.d
           cleanup: ./example/cleanup.d
+          push: "false"
