@@ -20,6 +20,6 @@ jobs:
           compose: ./example/docker-compose.yml
           tags: "test latest"
           age: "0"
-          init: ./example/init.d
-          cleanup: ./example/cleanup.d
+          init: ./example/build-init.d
+          cleanup: ./example/build-cleanup.d
           push: "false"
