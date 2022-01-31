@@ -103,6 +103,12 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  images:
+    description: |
+      List of images that were built/pushed.
+    value: ${{ steps.build.outputs.images }}
+
 runs:
   using: composite
   steps:
@@ -117,42 +123,27 @@ runs:
         dependencies: |
           docker
     -
-      name: Build
+      name: Build (and Push)
       id: build
       shell: bash
-      if: ${{ ! inputs.push }}
       # Action syntax forces either version, or tag from `use`, so disable
       # download check.
       env:
         BUILD_DOWNLOADER: "-"
+        BUILD_PUSH: "${{ inputs.push }}"
+        BUILD_AGE: "${{ inputs.age }}"
       run: |
-        ${{ github.action_path }}/build.sh \
-          -f '${{ inputs.compose }}' \
-          -b '${{ inputs.builder }}' \
-          -s '${{ inputs.services }}' \
-          -t '${{ inputs.tags }}' \
-          -r '${{ inputs.registry }}' \
-          -i '${{ inputs.init }}' \
-          -c '${{ inputs.cleanup }}' \
-          ${{ inputs.options }}
-    -
-      name: Build and Push
-      id: push
-      shell: bash
-      if: ${{ inputs.push }}
-      # Action syntax forces either version, or tag from `use`, so disable
-      # download check.
-      env:
-        BUILD_DOWNLOADER: "-"
-      run: |
-        ${{ github.action_path }}/build.sh \
-          -f '${{ inputs.compose }}' \
-          -b '${{ inputs.builder }}' \
-          -s '${{ inputs.services }}' \
-          -t '${{ inputs.tags }}' \
-          -r '${{ inputs.registry }}' \
-          -i '${{ inputs.init }}' \
-          -c '${{ inputs.cleanup }}' \
-          -a '${{ inputs.age }}' \
-          -p \
-          ${{ inputs.options }}
+        images=$( ${{ github.action_path }}/build.sh \
+                    -f '${{ inputs.compose }}' \
+                    -b '${{ inputs.builder }}' \
+                    -s '${{ inputs.services }}' \
+                    -t '${{ inputs.tags }}' \
+                    -r '${{ inputs.registry }}' \
+                    -i '${{ inputs.init }}' \
+                    -c '${{ inputs.cleanup }}' \
+                    ${{ inputs.options }} )
+        printf '%s\n' "$images"
+        # Perform following replacements: %->%25 \n->%0A \r->%0D, keeping the
+        # line ending marker out. The complex sed newline replacement is
+        # because sed works line-by-line.
+        printf '::set-output name=images::%s\n' "$(printf %s "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//')"

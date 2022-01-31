@@ -49,17 +49,17 @@ warning when a new version is available.
 ### Compose Example
 
 The script is designed to work against compose files according to the following
-skeleton:
+[skeleton](./example/docker-compose.yml):
 
 ```yaml
 version: "2.2"
 
 services:
   myservice:
-  build:
-    context: .
-    dockerfile: Dockerfile
-  image: myregistry.mydomain.com/myimage
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myregistry.mydomain.com/myimage
 ```
 
 ### Pure Relay
@@ -284,7 +284,9 @@ the list of pushed images will be present.
 
 The script doubles as a GitHub Action, use it in a workflow as exemplified
 below, provided you have access to `docker`. For a complete list of inputs and
-their usage, consult the [`action.yml`](./action.yml) file.
+their usage, consult the [`action.yml`](./action.yml) file. The action results
+in an output called `images`. `images` contains the list of images that were
+built/pushed, one per line.
 
 ```yaml
 jobs:
@@ -296,12 +298,6 @@ jobs:
         with:
           compose: <path-to-compose.yml>
 ```
-
-Note that by default, the action attempts to make all the binaries available at
-their standard location under the extraction directory at the `PATH`. In other
-words, the default behaviour of the action is to leverage the behaviour of the
-[`-e`](#flag--e) flag. You can turn off this behaviour by setting the input
-called `path` to the string `"false"`.
 
 ## Future
 
