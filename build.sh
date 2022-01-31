@@ -143,7 +143,7 @@ done
 shift $((OPTIND-1))
 
 # Booleans
-to_lower() { printf %s\\n "$1" | tr '[:upper]' '[:lower:]'; }
+to_lower() { printf %s\\n "$1" | tr '[:upper:]' '[:lower:]'; }
 is_true() {
     [ "$1" != "0" ] \
     || [ "$(to_lower "$1")" = "true" ] \
