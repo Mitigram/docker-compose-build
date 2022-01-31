@@ -145,7 +145,7 @@ shift $((OPTIND-1))
 # Booleans
 to_lower() { printf %s\\n "$1" | tr '[:upper:]' '[:lower:]'; }
 is_true() {
-    [ "$1" != "0" ] \
+    [ "$1" = "1" ] \
     || [ "$(to_lower "$1")" = "true" ] \
     || [ "$(to_lower "$1")" = "on" ] \
     || [ "$(to_lower "$1")" = "yes" ]; }
