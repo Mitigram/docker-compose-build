@@ -25,7 +25,7 @@ pathfind() {
 }
 
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.5.2
+BUILD_VERSION=1.6.0
 
 # The location of the compose file. This file contains information about the
 # images to generate.
@@ -220,59 +220,39 @@ glob() {
 }
 
 
-# Without a 2nd argument, this function will return the entire definition of the
-# service which name is passed as a first argument. When a 2nd argument is
-# given, it should be an integer and only the lines at this exact identation
-# level passed will be returned
+# returns the entire definition of the service which name is passed as a first
+# argument.
 service() {
   # shellcheck disable=SC3043
-  local svc_line end_line lvl || true
+  local svc_line end_line || true
 
-  if [ -z "${2:-}" ]; then
-    # Find the line (within the services section) where the service definition
-    # for $1 starts.
-    svc_line=$( tail +"$svc_section" "$BUILD_COMPOSE" |
-                grep -En "^${indent}${1}:" |
-                cut -d: -f1 )
-    # Find the end line, or rather the line at which the next service definition
-    # starts. This might be empty, when the service is last in the file
-    end_line=$( tail +"$svc_section" "$BUILD_COMPOSE" |
-                tail +"$svc_line" |
-                grep -En "^${indent}[a-zA-Z0-9].*:" |
-                tail +2 |
-                head -1 |
-                cut -d: -f1 )
-    if [ -z "$end_line" ]; then
-      # No end_line, service was last, just tail
-      tail +"$svc_section" "$BUILD_COMPOSE" |
-          tail +"$svc_line"
-    else
-      # There was an end_line, decrement by 1 and print out this sub-section
-      # only.
-      end_line=$(( end_line - 1))
-      tail +"$svc_section" "$BUILD_COMPOSE" |
-          tail +"$svc_line" |
-          head -"$end_line"
-    fi
+  # Find the line (within the services section) where the service definition
+  # for $1 starts.
+  svc_line=$( tail +"$svc_section" "$BUILD_COMPOSE" |
+              grep -En "^${indent}${1}:" |
+              cut -d: -f1 )
+  # Find the end line, or rather the line at which the next service definition
+  # starts. This might be empty, when the service is last in the file
+  end_line=$( tail +"$svc_section" "$BUILD_COMPOSE" |
+              tail +"$svc_line" |
+              grep -En "^${indent}[a-zA-Z0-9].*:" |
+              tail +2 |
+              head -1 |
+              cut -d: -f1 )
+  if [ -z "$end_line" ]; then
+    # No end_line, service was last, just tail
+    tail +"$svc_section" "$BUILD_COMPOSE" |
+        tail +"$svc_line" |
+        grep -v '^[[:space:]]*#.*'
   else
-    # When an identation level is specified, do as if none was specify to get
-    # the entire service definition, then isolate the keys. Arrange to have the
-    # dash in the grep, in case an array is at this identation level.
-    lvl=$(printf "%${2}s" "" | sed "s/ /${indent}/g"); # repeats indent $2 times
-    service "$1" | grep -E "^${lvl}[a-z-]"
+    # There was an end_line, decrement by 1 and print out this sub-section
+    # only.
+    end_line=$(( end_line - 1))
+    tail +"$svc_section" "$BUILD_COMPOSE" |
+        tail +"$svc_line" |
+        head -"$end_line" |
+        grep -v '^[[:space:]]*#.*'
   fi
-}
-
-
-# Provided identation and the service section have been properly detected in the
-# compose file, this function will look for the value of the keyword $3, in the
-# service description of $1. The keyword should be at indentation level $2.
-valueof() {
-  service "$1" "$2" |
-    grep "$3" |
-    head -n 1 |
-    sed -E "s/^[[:space:]]+${3}:(.*)/\\1/" |
-    sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
 
@@ -283,6 +263,102 @@ services() {
     sed -E -e 's/^\s+//g' -e 's/:$//g'
 }
 
+
+# Return the number of spaces matching the indentation level passed as $1
+indent() {
+  printf "%${1}s" "" | sed "s/ /${indent}/g"; # repeats indent $1 times
+}
+
+
+# Provided identation and the service section have been properly detected in the
+# compose file, this function will look for the tree under the keyword "$1" at
+# indentation level "$2". The line containing the keywork "$1" itself is
+# NOT returned as a part of the tree.
+treeof() {
+  # shellcheck disable=SC3043
+  local lvl || true
+
+  lvl=$(indent "$2")
+  sed -nE "/^${lvl}${1}/,/^${lvl}[a-zA-Z0-9.-_]/p" | grep -E "^${lvl}${indent}"
+}
+
+
+unquote() {
+  sed -E \
+    -e 's/^[[:space:]]+//' \
+    -e 's/[[:space:]]+$//' \
+    -e 's/^"//' \
+    -e 's/"$//' \
+    -e "s/^'//" \
+    -e "s/'$//"
+}
+
+
+# Given a YAML snippet, look for the value of the first occurence of "$1". When
+# "$2" is not empty, it should be an indentation level and "$1" is forced to be
+# at that level.
+valueof() {
+  # shellcheck disable=SC3043
+  local lvl || true
+
+  lvl='[[:space:]]+'
+  if [ -n "${2:-}" ]; then
+    lvl=$(indent "$2")
+  fi
+
+  grep -E "^[[:space:]]+${1}" |
+    head -n 1 |
+    sed -E "s/^${lvl}${1}:(.*)/\\1/" |
+    unquote
+}
+
+
+# Given a YAML snippet, check if it has a key "$1". When "$2" is not empty, it
+# should be an indentation level and "$1" is forced to be at that level.
+haskey() {
+  # shellcheck disable=SC3043
+  local lvl || true
+
+  lvl='[[:space:]]+'
+  if [ -n "${2:-}" ]; then
+    lvl=$(indent "$2")
+  fi
+
+  grep -Eq "^${lvl}${1}"
+}
+
+
+# Given a service $1, with a tree starting at "$2" under the build spec,
+# construct as many CLI setting commands as there are values under $2. Each CLI
+# setting command will be prefixed with --$3. This is used to transform the
+# values under args or labels into CLI options and values that will be then
+# passed to docker build.
+unwind() {
+  # The while-loop narrows down to the proper tree, and remove all leading
+  # spaces to ease parsing below.
+  while IFS= read -r line; do
+    if printf %s\\n "$line" | grep -q '^-'; then
+      # This is in array-style, pick up the = setting string from the compose
+      # file and pass as is after unquoting (we will always force quotes).
+      printf '%s "%s" ' "--$3" "$(printf %s\\n "$line" | sed -E 's/^-[[:space:]]+//' | unquote)"
+    else
+      # Otherwise, this is a "key: val"-style. Extract the key and the value and
+      # format a proper CLI option out of them.
+
+      # shellcheck disable=SC3043
+      local key val || true
+
+      # Extract key and val, based on the occurence of the first ":" sign
+      key=$(printf %s\\n "$line" | sed -E 's/^([^:]+):.*/\1/')
+      val=$(printf %s\\n "$line" | sed -E "s/^[^:]+:(.*)/\\1/" | unquote)
+      # Create CLI setting option, forcing quotes around
+      printf '%s "%s=%s" ' "--$3" "$key" "$val"
+    fi
+  done <<EOF
+$(service "$1" | treeof "build" 2| treeof "$2" 3 | sed -E 's/^[[:space:]]+//g')
+EOF
+  printf \\n
+}
 
 # Change registry of the image passed as $1
 reroot() {
@@ -313,7 +389,7 @@ image() {
   # shellcheck disable=SC3043
   local image || true
 
-  image=$(valueof "$1" 2 "image")
+  image=$(service "$1" | valueof "image" 2)
 
   # Does the image contain a reference to a shell variable of some sort?
   # shellcheck disable=SC2016 # We **want** to detect the $ sign!!
@@ -347,7 +423,7 @@ image() {
 # blindly passed to the docker build command.
 docker_build() {
   # shellcheck disable=SC3043
-  local image context dockerfile buildercmd || true
+  local image context dockerfile buildercmd buildArgs labels cli || true
 
   # Pick image name to build, at proper tag
   if [ -z "${2:-}" ]; then
@@ -358,21 +434,39 @@ docker_build() {
     image=$(image "$1" "${2}")
   fi
 
-  context=$(valueof "$1" 2 "build")
-  if [ -n "$context" ]; then
+  context=$(service "$1" | valueof "build")
+  buildArgs=
+  labels=
+  cli=
+  if [ -z "$context" ]; then
     # Pick context and Dockerfile location from the service description, default
     # to the same as docker-compose defaults.
-    context=$(valueof "$1" 3 "context")
+    context=$(service "$1" | treeof "build" 2 | valueof "context" 3)
     if [ -z "$context" ]; then
       context=.
     fi
-    dockerfile=$(valueof "$1" 3 "dockerfile")
+    dockerfile=$(service "$1" | treeof "build" 2| valueof "dockerfile" 3)
     if [ -z "$dockerfile" ]; then
       dockerfile=$( find "$(dirname "$BUILD_COMPOSE")/${context}" \
                       -mindepth 1 -maxdepth 1 -iname Dockerfile |
                     head -n 1)
       if [ -n "$dockerfile" ]; then dockerfile=$(basename -- "$dockerfile"); fi
     fi
+
+    # Add build arguments and labels from file
+    if service "$1" | treeof "build" 2 | haskey "args" 3; then
+      buildArgs=$(unwind "$1" "args" "build-arg")
+    fi
+    if service "$1" | treeof "build" 2 | haskey "labels" 3; then
+      labels=$(unwind "$1" "labels" "label")
+    fi
+
+    # Carry further other command-line arguments.
+    for key in target network shm_size; do
+      if service "$1" | treeof "build" 2 | haskey "$key" 3; then
+        cli="$cli --$(printf %s\\n "${key}"|tr '_' '-') \"$(service "$1" | treeof "build" 2 | valueof "$key" 3)\""
+      fi
+    done
   else
     dockerfile=$( find "$(dirname "$BUILD_COMPOSE")/${context}" \
                     -mindepth 1 -maxdepth 1 -iname Dockerfile |
@@ -393,19 +487,21 @@ docker_build() {
   # Decide upon command to use for building, e.g. old-style docker build or
   # new buildx with BuildKit.
   if [ "$BUILD_BUILDER" = "docker" ]; then
-    buildercmd="${BUILD_DOCKER_BIN} build"
+    buildercmd="${BUILD_DOCKER_BIN} build $buildArgs $labels $cli"
   else
-    buildercmd="${BUILD_DOCKER_BIN} buildx build --load"
+    buildercmd="${BUILD_DOCKER_BIN} buildx build --load $buildArgs $labels $cli"
   fi
 
   # Perform build command, we do this in a sub-shell to be able to temporarily
-  # change directory.
+  # change directory. This uses eval to properly carry on quoting from the $cli,
+  # $buildArgs and $labels variables (via the $dockercmd variable).
   if is_true "$BUILD_DRYRUN"; then
-    warn "Would run following in $context subdir: $buildercmd -t \"$image\" -f \"$dockerfile\" $*"
+    warn "Would run following in $context subdir: $buildercmd -t \"$image\" -f \"$dockerfile\" $* ."
   else
+    verbose "Running in $context subdir: $buildercmd -t \"$image\" -f \"$dockerfile\" $* ."
     ( cd "$(dirname "$BUILD_COMPOSE")" \
-      cd "${context}" \
-      && $buildercmd -t "$image" -f "$dockerfile" "$@" . ) 1>&2
+      && cd "${context}" \
+      && eval "$buildercmd" -t "$image" -f "$dockerfile" "$*" . ) 1>&2
 
     # When we won't have to push, the list of images printed on the stdout is the
     # list of built images. So print the name of the image out.
@@ -433,7 +529,7 @@ image_push() {
     image=$(image "$1" "${2}")
   fi
 
-  if service "$1" 2 | grep -q build; then
+  if service "$1" | haskey "build" 2; then
     if is_true "$BUILD_DRYRUN"; then
       if [ "$BUILD_AGE" -le "0" ]; then
         warn "Would push $image if it existed"
@@ -667,7 +763,7 @@ case "$BUILD_BUILDER" in
     fi
 
     for svc in $BUILD_SERVICES; do
-      if service "$svc" 2 | grep -q build; then
+      if service "$svc" | haskey "build" 2; then
         if [ -z "$BUILD_TAGS" ]; then
           docker_build "$svc" "" "$@"
         else
