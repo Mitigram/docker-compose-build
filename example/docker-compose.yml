@@ -4,5 +4,15 @@ services:
   alpine:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
+      labels:
+        org.opencontainers.image.authors: Yourself
+        org.opencontainers.image.vendor: "Your organisation"
+      network: host
+      args:
+        - TEST=test
+        - "TEST2=gnurf"
     image: efrecon/myalpine
+  enipla:
+    build: .
+    image: efrecon/enipla
