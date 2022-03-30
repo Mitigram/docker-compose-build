@@ -19,13 +19,20 @@ pathfind() {
   _paths=$1; shift
   printf %s\\n "$_paths"|sed 's/:/\n/g'|grep -vE '^$'|while IFS= read -r dir; do
     for _name in "$@"; do
-      find "$dir" -mindepth 1 -maxdepth 1 -name "$_name" 2>/dev/null
+      if [ -d "$dir" ]; then
+        find "$dir" -mindepth 1 -maxdepth 1 -name "$_name" 2>/dev/null
+      fi
     done
   done | head -n 1
 }
 
+# Source the reg-tags implementation, this uses a search path in order to
+# facilitate relocating (e.g. from Docker image).
+# shellcheck disable=SC1090   # Dynamic search on purpose
+. "$(pathfind "${BUILD_ROOTDIR%/}/lib/reg-tags:${BUILD_ROOTDIR%/}/../lib:${BUILD_ROOTDIR%/}/../share/docker-compose-build" image_tags.sh)"
+
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.6.0
+BUILD_VERSION=1.7.0
 
 # The location of the compose file. This file contains information about the
 # images to generate.
@@ -360,24 +367,48 @@ EOF
   printf \\n
 }
 
-# Change registry of the image passed as $1
-reroot() {
+# Extract tag of an image, defaulting to the one passed as a second parameter
+# when specified and no tag present in image
+imgtag() {
   # shellcheck disable=SC3043
-  local img ctag imgname || true
+  local ctag || true
 
-  # Extract the fully-qualified name of the image out of the first argument.
-  img=$(printf %s\\n "$1"|grep -Eo '[a-zA-Z0-9.]+(:[0-9]+)?(/[a-zA-Z0-9_.-]+){1,3}')
   # Extract the tag. The regular expression works by refusing the : or the / in
   # the tag, the / is to handle the case where the registry is a DNS together
   # with a port (led by a colon, but there will be a slash after that colon).
   # Note that the tag WILL include the leading colon sign; this is on purpose.
   # The entire extraction goes through || true, because some images have no tag.
   ctag=$(printf %s\\n "$1"|grep -Eo ':[^:^/]+$' || true)
+  if [ -z "$ctag" ] && [ -n "${2:-}" ]; then
+    ctag=$2
+  fi
+  printf %s\\n "${ctag#:}"
+}
+
+# Extract name of image, i.e. everything except the tag
+imgname() {
+  printf %s\\n "$1"|grep -Eo '[a-zA-Z0-9.]+(:[0-9]+)?(/[a-zA-Z0-9_.-]+){1,3}'
+}
+
+# Change registry of the image passed as $1
+reroot() {
+  # shellcheck disable=SC3043
+  local img ctag imgname || true
+
+  # Extract the fully-qualified name and tag of the image out of the first
+  # argument.
+  img=$(imgname "$1")
+  ctag=$(imgtag "$1")
   # Extract the name of the image, i.e. everything after the LAST slash.
   imgname=$(printf %s\\n "$img" | awk -F / '{print $NF}')
   # Reroot under the registry passed as a second argument (or the default one
-  # from BUILD_REGISTRY), keeping the same tag.
-  printf %s/%s%s\\n "${2:-${BUILD_REGISTRY%/}}" "$imgname" "$ctag"
+  # from BUILD_REGISTRY), keeping the same tag (or no tag if none was specified
+  # from the start).
+  if [ -z "$ctag" ]; then
+    printf %s/%s\\n "${2:-${BUILD_REGISTRY%/}}" "$imgname"
+  else
+    printf %s/%s:%s\\n "${2:-${BUILD_REGISTRY%/}}" "$imgname" "$ctag"
+  fi
 }
 
 
@@ -550,7 +581,9 @@ image_push() {
       # just built it.
       now=$(date +%s)
       age=$(( now - tstamp ))
-      if [ "$age" -lt "$BUILD_AGE" ] || [ "$BUILD_AGE" -le "0" ]; then
+      if ! img_tags "$(imgname "$image")" | grep -qF "$(imgtag "$image" latest)" \
+          || [ "$age" -lt "$BUILD_AGE" ] \
+          || [ "$BUILD_AGE" -le "0" ]; then
         verbose "Pushing $image to Docker registry"
         ${BUILD_DOCKER_BIN} push "$image" 1>&2
         # When we have to push, the list of images printed on the stdout is the
