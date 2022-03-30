@@ -10,6 +10,7 @@ branding:
 inputs:
   compose:
     description: Path to the compose file
+    default: "docker-compose.yml"
     required: true
 
   push:
