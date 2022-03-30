@@ -1,3 +1,4 @@
+---
 name: Compose Build
 description: |
   Build from compose file, with additional features such as changing destination
@@ -10,6 +11,7 @@ branding:
 inputs:
   compose:
     description: Path to the compose file
+    default: "docker-compose.yml"
     required: true
 
   push:
@@ -132,6 +134,7 @@ runs:
         BUILD_DOWNLOADER: "-"
         BUILD_PUSH: "${{ inputs.push }}"
         BUILD_AGE: "${{ inputs.age }}"
+      # yamllint disable rule:line-length
       run: |
         images=$( ${{ github.action_path }}/build.sh \
                     -f '${{ inputs.compose }}' \
@@ -147,3 +150,4 @@ runs:
         # line ending marker out. The complex sed newline replacement is
         # because sed works line-by-line.
         printf '::set-output name=images::%s\n' "$(printf %s "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//')"
+      # yamllint enable rule:line-length
