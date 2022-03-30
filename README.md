@@ -35,10 +35,8 @@ line. This is to facilitate automation. All other output (logging, output of
 `docker` or `docker-compose`, etc.) is redirected to `stderr`.
 
 To use this script in your projects, you can either make this project a
-[submodule] or [subtree] of your main project, or simply copy the last version
-of the script. The script will automatically check if there are new versions
-available once all build and push operations have finished. It will print a
-warning when a new version is available.
+[submodule] or [subtree] of your main project. The script will print a warning
+when a new version is available.
 
   [compose]: https://compose-spec.io/
   [submodule]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
@@ -188,11 +186,15 @@ the one from the compose file.
 ### Option `-a` and `BUILD_AGE` Variable
 
 Specifies the maximum age of the image since creation to decide whether it
-should be pushed or not. This is a safety measure to avoid pushing junk images
+should be pushed or not. This is a safety measure to avoid pushing "junk" images
 that would have been built at a prior run of the script, but without the
 [`-p`](#flag--p-and-build_push-variable) flag. The default of `1200` seconds
 should work in most cases, but any negative value will turn this check off,
 meaning that all relevant images will be pushed, disregarding their age.
+
+The implementation will **always** check if the destination image (and tag)
+exists at the remote registry. When it does not, and disregarding the specified
+age, the image will be pushed to ensure its existence.
 
 ### Option `-i` and `BUILD_INIT_DIR` Variable
 
