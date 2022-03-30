@@ -36,11 +36,15 @@ line. This is to facilitate automation. All other output (logging, output of
 
 To use this script in your projects, you can either make this project a
 [submodule] or [subtree] of your main project. The script will print a warning
-when a new version is available.
+when a new version is available. This script itself makes [use] of a [reg-tags]
+as a [subtree] to interact with remote Docker registries without downloading the
+images.
 
   [compose]: https://compose-spec.io/
   [submodule]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
   [subtree]: https://git-memo.readthedocs.io/en/latest/subtree.html
+  [use]: ./lib/README.md
+  [reg-tags]: https://github.com/efrecon/reg-tags
 
 ## Example
 
