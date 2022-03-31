@@ -29,7 +29,7 @@ pathfind() {
 # Source the reg-tags implementation, this uses a search path in order to
 # facilitate relocating (e.g. from Docker image).
 # shellcheck disable=SC1090   # Dynamic search on purpose
-. "$(pathfind "${BUILD_ROOTDIR%/}/lib/reg-tags:${BUILD_ROOTDIR%/}/../lib:${BUILD_ROOTDIR%/}/../share/docker-compose-build" image_tags.sh)"
+. "$(pathfind "${BUILD_ROOTDIR%/}/lib/reg-tags:${BUILD_ROOTDIR%/}/../lib:${BUILD_ROOTDIR%/}/../share/docker-compose-build" image_api.sh)"
 
 # Version of script, this should be increased for each new release of the script
 BUILD_VERSION=1.7.0
