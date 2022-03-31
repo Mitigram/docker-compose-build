@@ -35,8 +35,8 @@ line. This is to facilitate automation. All other output (logging, output of
 `docker` or `docker-compose`, etc.) is redirected to `stderr`.
 
 The project even implements a [replacement](#docker-compose-shim) for
-`docker-compose build`, with a similar UX at the CLI (i.e. same set of options
-and flags).
+`docker-compose` `build` (and `push`), with a similar UX at the CLI (i.e. same
+set of options and flags).
 
 To use this script in your projects, you can either make this project a
 [submodule] or [subtree] of your main project. The script will print a warning
@@ -312,11 +312,19 @@ jobs:
 ## `docker-compose` Shim
 
 In addition, this project contains a [shim](./compose.sh) that is able to
-entirely **replace** `docker-compose build`. The shim can be installed and
-called `docker-compose` at the OS level and used to build Docker images directly
-with the `docker` client, bypassing `docker-compose` entirely. This can be
-usefull to use alternative projects for building Docker images, as long as they
-implement a `docker`-compatible CLI interface, e.g. [img] or [nerdctl].
+entirely **replace** `docker-compose` `build` (and `push`). The shim can be
+installed and called `docker-compose` at the OS level and used to build Docker
+images directly with the `docker` client, bypassing `docker-compose` entirely.
+This can be usefull to use alternative projects for building Docker images, as
+long as they implement a `docker`-compatible CLI interface, e.g. [img] or
+[nerdctl]. The shim is capable of translating the standard set of CLI options to
+the `build` command of `docker-compose`, to the specific set of options
+supported by the `build` command of the `docker`, `img` and `nerdctl` apps.
+
+To install the shim as `docker-compose`, you can make a copy of this project
+under `$HOME/.local/share/docker-compose-build` and create a symbolic link to
+the `compose.sh` script from `$HOME/.local/bin/docker-compose` (and arrange for
+`$HOME/.local/bin` to be first in your `$PATH`).
 
   [img]: https://github.com/genuinetools/img
   [nerdctl]: https://github.com/containerd/nerdctl

@@ -126,11 +126,14 @@ while [ "$#" -gt 0 ]; do
     -h | --help)  # Print help and return
       usage ;;
 
+    --)
+      shift; break;;
+
     -*)
       ERROR "${1%=*} unknown option!" >&2; usage 1;;
 
     *)
-      break
+      break;;
   esac
 done
 
@@ -182,7 +185,8 @@ cmd_build() {
         opt_quiet \
         line \
         build_args \
-        client_version || true
+        client_version \
+        services || true
 
   # Defaults
   opt_pull=0
@@ -236,11 +240,21 @@ cmd_build() {
         rm -f "$build_args"
         _cmd_usage "cmd_build" "build command will build or rebuild services from compose file" ;;
 
-      *)
+      --)
+        shift; break;;
+
+      -*)
         rm -f "$build_args"
         ERROR "${1%=*} unknown option!" >&2; _cmd_usage "cmd_build" "build command will build or rebuild services from compose file";;
+
+      *)
+        break;;
     esac
   done
+
+  # Capture list of services and reset argument list
+  services="$*"
+  set --
 
   # Get the short Docker client version. This also prints a unique identifier
   # for the type of the client, which is the reason why we are interested in the
@@ -324,6 +338,7 @@ cmd_build() {
     exec "$COMPOSE_SHIM" \
       -f "$COMPOSE_FILE" \
       -b "auto" \
+      -s "$services" \
       -i "" \
       -c "" \
       -a -1 \
@@ -333,12 +348,71 @@ cmd_build() {
     exec "$COMPOSE_SHIM" \
       -f "$COMPOSE_FILE" \
       -b "auto" \
+      -s "$services" \
       -i "" \
       -c "" \
       -a -1 \
       -- "$@"
   fi
 }
+
+
+cmd_push() {
+  # shellcheck disable=SC3043
+  local services || true
+
+  # Defaults
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --ignore-push-failures)
+        ERROR "$1 not implemented"; shift;;
+
+      -h | --help)   # Print help and return
+        _cmd_usage "cmd_push" "Push service images" ;;
+
+      --)
+        shift; break;;
+
+      -*)
+        ERROR "${1%=*} unknown option!" >&2; _cmd_usage "cmd_push" "Push service images";;
+
+      *)
+        break;;
+    esac
+  done
+
+  # Capture list of services and reset argument list
+  services="$*"
+  set --
+
+  # Now set/export relevant variables and pass further everything to the underlying
+  # implementation.
+  BUILD_COMPOSE_BIN=
+  export DOCKER_HOST BUILD_COMPOSE_BIN BUILD_DOCKER_BIN
+  if [ "$COMPOSE_VERBOSE" -gt 0 ]; then
+    exec "$COMPOSE_SHIM" \
+      -f "$COMPOSE_FILE" \
+      -b "" \
+      -s "$services" \
+      -p \
+      -i "" \
+      -c "" \
+      -a -1 \
+      -v \
+      -- "$@"
+  else
+    exec "$COMPOSE_SHIM" \
+      -f "$COMPOSE_FILE" \
+      -b "" \
+      -s "$services" \
+      -p \
+      -i "" \
+      -c "" \
+      -a -1 \
+      -- "$@"
+  fi
+}
+
 
 cmd__build() {
   if [ "$COMPOSE_VERBOSE" -gt 0 ]; then
