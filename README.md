@@ -321,6 +321,11 @@ long as they implement a `docker`-compatible CLI interface, e.g. [img] or
 the `build` command of `docker-compose`, to the specific set of options
 supported by the `build` command of the `docker`, `img` and `nerdctl` apps.
 
+To install the shim as `docker-compose`, you can make a copy of this project
+under `$HOME/.local/share/docker-compose-build` and create a symbolic link to
+the `compose.sh` script from `$HOME/.local/bin/docker-compose` (and arrange for
+`$HOME/.local/bin` to be first in your `$PATH`).
+
   [img]: https://github.com/genuinetools/img
   [nerdctl]: https://github.com/containerd/nerdctl
 
