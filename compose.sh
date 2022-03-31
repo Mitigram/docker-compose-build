@@ -45,17 +45,34 @@ DEBUG() { [ "$COMPOSE_VERBOSE" -ge "2" ] && __LOG "$1"; }
 ERROR() { __LOG "$1"; }
 
 # shellcheck disable=SC2120
+align() {
+  # shellcheck disable=SC3043
+  local line || true
+
+  while IFS= read -r line; do
+    printf "%s%s %s\n" \
+      "$(printf "%.${1:-20}s\n" "$(printf "%s\n" "$line"|cut -d "${2:-":"}" -f 1)$(head -c "${1:-20}" < /dev/zero | tr '\0' ' ')")" \
+      "${2:-":"}" \
+      "$(printf %s\\n "$line"|cut -d "${2:-":"}" -f 2-)"
+  done
+}
+
+# shellcheck disable=SC2120
 usage() {
   sed -E 's/^\s+/  /g' <<-EOF
-    ${0} is a compose shim
+    $(basename "$0") is a compose build shim. It behaves like docker-compose build,
+    supports a large subset of its options, but reimplements them directly on top
+    of the docker client. The client can be an alternative build client, such as
+    nerdctl or img.
 
     Options:
 EOF
-  head -100 "$0"  |
+  head -150 "$0"  |
     grep -E '\s+-[a-zA-Z-].*)\s+#' |
     sed -E \
         -e 's/^\s+/    /g' \
-        -e 's/\)\s+#\s+/:\t/g'
+        -e 's/\)\s+#\s+/:/g' |
+    align
   exit "${1:-0}"
 }
 
@@ -124,11 +141,12 @@ _cmd_usage() {
 
     Options:
 EOF
-  grep -E -A 60 -e "^${1}" "$0" |
+  grep -E -A 70 -e "^${1}" "$0" |
     grep -E '\s+-[a-zA-Z-].*)\s+#' |
     sed -E \
         -e 's/^\s+/    /g' \
-        -e 's/\)\s+#\s+/:\t/g'
+        -e 's/\)\s+#\s+/:/g' |
+  align
   exit "${3:-0}"
 }
 
@@ -194,10 +212,10 @@ cmd_build() {
         opt_quiet=1; shift;;
 
       -h | --help)   # Print help and return
-        _cmd_usage "cmd_build" "Build or rebuild services" ;;
+        _cmd_usage "cmd_build" "build command will build or rebuild services from compose file" ;;
 
       *)
-        ERROR "${1%=*} unknown option!" >&2; _cmd_usage "cmd_build" "Build or rebuild services";;
+        ERROR "${1%=*} unknown option!" >&2; _cmd_usage "cmd_build" "build command will build or rebuild services from compose file";;
     esac
   done
 
