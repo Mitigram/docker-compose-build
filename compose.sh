@@ -29,6 +29,7 @@ pathfind() {
 COMPOSE_PATH_SEPARATOR=${COMPOSE_PATH_SEPARATOR:-":"}
 COMPOSE_FILE=${COMPOSE_FILE:-"$(pathfind "$(pwd)" docker-compose.yml docker-compose.yaml)"}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-""}
+BUILD_DOCKER_BIN=${BUILD_DOCKER_BIN:-"docker"}
 
 DOCKER_HOST=${DOCKER_HOST:-""}
 
@@ -171,7 +172,17 @@ cmd_version() {
 
 cmd_build() {
   # shellcheck disable=SC3043
-  local opt_pull opt_cache opt_memory opt_rm opt_progress opt_compress opt_force_rm opt_quiet line build_args || true
+  local opt_pull \
+        opt_cache \
+        opt_memory \
+        opt_rm \
+        opt_progress \
+        opt_compress \
+        opt_force_rm \
+        opt_quiet \
+        line \
+        build_args \
+        client_version || true
 
   # Defaults
   opt_pull=0
@@ -231,31 +242,84 @@ cmd_build() {
     esac
   done
 
-  # Convert docker-compose CLI-compatible options to docker build compatible
-  # options
-  [ "$opt_pull" = "1" ] && set -- "$@" --pull
-  [ "$opt_force_rm" = "1" ] && set -- "$@" --force-rm
-  [ "$opt_cache" = "0" ] && set -- "$@" --no-cache
-  [ -n "$opt_memory" ] && set -- "$@" --memory="$opt_memory"
-  if [ "$opt_rm" = "0" ]; then
-    set -- "$@" --rm=false
-  else
-    set -- "$@" --rm=true
-  fi
-  set -- "$@" --progress="$opt_progress"
-  [ "$opt_compress" = "1" ] && set -- "$@" --compress
-  [ "$opt_quiet" = "1" ] && set -- "$@" --quiet
+  # Get the short Docker client version. This also prints a unique identifier
+  # for the type of the client, which is the reason why we are interested in the
+  # version in the first place.
+  client_version=$("$BUILD_DOCKER_BIN" --version)
 
-  # Add the build arguments that were collected in the temporary file
-  while IFS= read -r line || [ -n "$line" ]; do
-    set -- "$@" --build-arg "$line"
-  done < "$build_args"
+  if printf %s\\n "$client_version" | grep -qiF docker; then
+    # Convert docker-compose CLI-compatible options to docker build compatible
+    # options
+    [ "$opt_pull" = "1" ] && set -- "$@" --pull
+    [ "$opt_force_rm" = "1" ] && set -- "$@" --force-rm
+    [ "$opt_cache" = "0" ] && set -- "$@" --no-cache
+    [ -n "$opt_memory" ] && set -- "$@" --memory="$opt_memory"
+    if [ "$opt_rm" = "0" ]; then
+      set -- "$@" --rm=false
+    else
+      set -- "$@" --rm=true
+    fi
+    set -- "$@" --progress="$opt_progress"
+    [ "$opt_compress" = "1" ] && set -- "$@" --compress
+    [ "$opt_quiet" = "1" ] && set -- "$@" --quiet
+
+    # Add the build arguments that were collected in the temporary file
+    while IFS= read -r line || [ -n "$line" ]; do
+      set -- "$@" --build-arg "$line"
+    done < "$build_args"
+  elif printf %s\\n "$client_version" | grep -qiF img; then
+    # Convert docker-compose CLI-compatible options to img build compatible
+    # options
+    [ "$opt_pull" = "1" ] && ERROR "--pull is not supported by img"
+    [ "$opt_force_rm" = "1" ] && ERROR "--force-rm is not supported by img"
+    [ "$opt_cache" = "0" ] && set -- "$@" --no-cache
+    [ -n "$opt_memory" ] && ERROR "-m/--memory is not supported by img"
+    [ "$opt_rm" = "0" ] && ERROR "--rm is not supported by img"
+    case "$opt_progress" in
+      plain)
+        set -- "$@" --no-console;;
+      tty)
+        ;;
+      auto)
+        if ! [ -t 1 ]; then
+          set -- "$@" --no-console
+        fi
+        ;;
+    esac
+    [ "$opt_compress" = "1" ] && ERROR "--compress is not supported by img"
+    [ "$opt_quiet" = "1" ] && ERROR "-q/--quiet is not supported by img"
+
+    # Add the build arguments that were collected in the temporary file
+    while IFS= read -r line || [ -n "$line" ]; do
+      set -- "$@" --build-arg "$line"
+    done < "$build_args"
+  elif printf %s\\n "$client_version" | grep -qiF nerdctl; then
+    # Convert docker-compose CLI-compatible options to nerdctl build compatible
+    # options
+    [ "$opt_pull" = "1" ] && ERROR "--pull is not supported by img"
+    [ "$opt_force_rm" = "1" ] && ERROR "--force-rm is not supported by img"
+    [ "$opt_cache" = "0" ] && set -- "$@" --no-cache
+    [ -n "$opt_memory" ] && ERROR "-m/--memory is not supported by img"
+    if [ "$opt_rm" = "0" ]; then
+      set -- "$@" --rm=false
+    else
+      set -- "$@" --rm=true
+    fi
+    set -- "$@" --progress="$opt_progress"
+    [ "$opt_compress" = "1" ] && ERROR "--compress is not supported by img"
+    [ "$opt_quiet" = "1" ] && set -- "$@" --quiet
+
+    # Add the build arguments that were collected in the temporary file
+    while IFS= read -r line || [ -n "$line" ]; do
+      set -- "$@" --build-arg "$line"
+    done < "$build_args"
+  fi
   rm -f "$build_args"
 
   # Now set/export relevant variables and pass further everything to the underlying
   # implementation.
   BUILD_COMPOSE_BIN=
-  export DOCKER_HOST BUILD_COMPOSE_BIN
+  export DOCKER_HOST BUILD_COMPOSE_BIN BUILD_DOCKER_BIN
   if [ "$COMPOSE_VERBOSE" -gt 0 ]; then
     exec "$COMPOSE_SHIM" \
       -f "$COMPOSE_FILE" \
