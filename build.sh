@@ -32,7 +32,7 @@ pathfind() {
 . "$(pathfind "${BUILD_ROOTDIR%/}/lib/reg-tags:${BUILD_ROOTDIR%/}/../lib:${BUILD_ROOTDIR%/}/../share/docker-compose-build" image_api.sh)"
 
 # Version of script, this should be increased for each new release of the script
-BUILD_VERSION=1.7.3
+BUILD_VERSION=1.7.4
 
 # The location of the compose file. This file contains information about the
 # images to generate.
