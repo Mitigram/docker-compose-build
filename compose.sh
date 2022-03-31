@@ -33,7 +33,6 @@ COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-""}
 DOCKER_HOST=${DOCKER_HOST:-""}
 
 COMPOSE_VERBOSE=${COMPOSE_VERBOSE:-"0"}
-COMPOSE_VERSION=0.1.0
 if stat -c %F "$0" | grep -qiF "link"; then
   COMPOSE_REALDIR=$(cd -P -- "$(dirname -- "$(command -v -- "$(readlink "$0")")")" && pwd -P )
   COMPOSE_SHIM=${COMPOSE_SHIM:-"$(pathfind "${COMPOSE_REALDIR}:${COMPOSE_ROOTDIR}" "build.sh")"}
@@ -166,7 +165,8 @@ cmd_help() {
 }
 
 cmd_version() {
-  printf "compose-build-shim version %s\n" "$COMPOSE_VERSION"
+  printf "compose-build-shim version %s\n" \
+    "$(grep '^BUILD_VERSION=' "$COMPOSE_SHIM" | head -n 1 | sed 's/^BUILD_VERSION=//')"
 }
 
 cmd_build() {
