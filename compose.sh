@@ -34,7 +34,12 @@ DOCKER_HOST=${DOCKER_HOST:-""}
 
 COMPOSE_VERBOSE=${COMPOSE_VERBOSE:-"0"}
 COMPOSE_VERSION=0.1.0
-COMPOSE_SHIM=${COMPOSE_SHIM:-"$(pathfind "$COMPOSE_ROOTDIR" "build.sh")"}
+if stat -c %F "$0" | grep -qiF "link"; then
+  COMPOSE_REALDIR=$(cd -P -- "$(dirname -- "$(command -v -- "$(readlink "$0")")")" && pwd -P )
+  COMPOSE_SHIM=${COMPOSE_SHIM:-"$(pathfind "${COMPOSE_REALDIR}:${COMPOSE_ROOTDIR}" "build.sh")"}
+else
+  COMPOSE_SHIM=${COMPOSE_SHIM:-"$(pathfind "${COMPOSE_ROOTDIR}" "build.sh")"}
+fi
 
 __LOG() {
     printf '[%s] [%s] %s\n' "$(date +'%Y%m%d-%H%M%S')" "$(basename "$0")" "${1:-}" >&2
@@ -65,7 +70,7 @@ usage() {
     of the docker client. The client can be an alternative build client, such as
     nerdctl or img.
 
-    Options:
+    Global options, appear before sub-commands:
 EOF
   head -150 "$0"  |
     grep -E '\s+-[a-zA-Z-].*)\s+#' |
@@ -73,6 +78,12 @@ EOF
         -e 's/^\s+/    /g' \
         -e 's/\)\s+#\s+/:/g' |
     align
+
+  printf "\n  Implemented sub-commands (-h to get command specific help):\n"
+  grep -E '^cmd_.*\(\)' "$0" |
+    sed -E \
+      -e 's/^cmd_/    /g' \
+      -e 's/\(\)\s*\{.*//g'
   exit "${1:-0}"
 }
 
@@ -171,8 +182,7 @@ cmd_build() {
   opt_progress=auto
   opt_compress=0
   opt_quiet=0
-  build_args=$(mktemp -t "build-argsXXXX")
-  chmod go-rwx "$build_args"
+  build_args=$(mktemp)
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --build-arg)
@@ -212,9 +222,11 @@ cmd_build() {
         opt_quiet=1; shift;;
 
       -h | --help)   # Print help and return
+        rm -f "$build_args"
         _cmd_usage "cmd_build" "build command will build or rebuild services from compose file" ;;
 
       *)
+        rm -f "$build_args"
         ERROR "${1%=*} unknown option!" >&2; _cmd_usage "cmd_build" "build command will build or rebuild services from compose file";;
     esac
   done
@@ -261,6 +273,19 @@ cmd_build() {
       -c "" \
       -a -1 \
       -- "$@"
+  fi
+}
+
+cmd__build() {
+  if [ "$COMPOSE_VERBOSE" -gt 0 ]; then
+    exec "$COMPOSE_SHIM" \
+      -f "$COMPOSE_FILE" \
+      -v \
+      "$@"
+  else
+    exec "$COMPOSE_SHIM" \
+      -f "$COMPOSE_FILE" \
+      "$@"
   fi
 }
 

@@ -5,8 +5,8 @@ This [script](#command-line-and-environment-configuration) (and GitHub
 [action](#github-action)) uses the (Docker) [compose] file to capture building
 information for your images, but can help out when pushing to several registries
 or tagging them with a release number (from a GitHub workflow?), for example.
-The script supplements and/or replaces `docker compose build` with
-`docker build` in order to:
+The script supplements and/or replaces `docker(-)compose build` with direct
+calls to `docker build` in order to:
 
 + [Push](#option--b-and-build_builder-variable) the resulting image(s) to their
   registries.
@@ -33,6 +33,10 @@ The result of this script is a list of the Docker images that were built (or
 [pushed](#flag--p-and-build_push-variable), depending) on `stdout`, one per
 line. This is to facilitate automation. All other output (logging, output of
 `docker` or `docker-compose`, etc.) is redirected to `stderr`.
+
+The project even implements a [replacement](#docker-compose-shim) for
+`docker-compose build`, with a similar UX at the CLI (i.e. same set of options
+and flags).
 
 To use this script in your projects, you can either make this project a
 [submodule] or [subtree] of your main project. The script will print a warning
@@ -305,13 +309,25 @@ jobs:
           compose: <path-to-compose.yml>
 ```
 
+## `docker-compose` Shim
+
+In addition, this project contains a [shim](./compose.sh) that is able to
+entirely **replace** `docker-compose build`. The shim can be installed and
+called `docker-compose` at the OS level and used to build Docker images directly
+with the `docker` client, bypassing `docker-compose` entirely. This can be
+usefull to use alternative projects for building Docker images, as long as they
+implement a `docker`-compatible CLI interface, e.g. [img] or [nerdctl].
+
+  [img]: https://github.com/genuinetools/img
+  [nerdctl]: https://github.com/containerd/nerdctl
+
 ## Future
 
 As [build] has become an optional part of the [compose] specification, this
-script could provide a replacement for `docker-compose build` (or the coming
-`docker compose build`), if ever this functionality was removed (?!). In its
-current shape, the tool only supports the most common build options, i.e.
-[context] and [dockerfile].
+script could provide a replacement for `docker compose build`, if ever this
+functionality was removed (?!). In its current shape, the tool supports the most
+common build options, i.e. [context] and [dockerfile], but also build arguments
+and labels.
 
   [build]: https://github.com/compose-spec/compose-spec/blob/master/build.md
   [context]: https://github.com/compose-spec/compose-spec/blob/master/build.md#context-required
