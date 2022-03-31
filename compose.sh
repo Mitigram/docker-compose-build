@@ -359,11 +359,9 @@ cmd_build() {
 
 cmd_push() {
   # shellcheck disable=SC3043
-  local opt_ignore \
-        services || true
+  local services || true
 
   # Defaults
-  opt_ignore=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --ignore-push-failures)
