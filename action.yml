@@ -145,9 +145,9 @@ runs:
                     -i '${{ inputs.init }}' \
                     -c '${{ inputs.cleanup }}' \
                     ${{ inputs.options }} )
-        printf '%s\n' "$images"
+        echo "$images"
         # Perform following replacements: %->%25 \n->%0A \r->%0D, keeping the
         # line ending marker out. The complex sed newline replacement is
         # because sed works line-by-line.
-        printf '::set-output name=images::%s\n' "$(printf %s "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//')"
+        echo "images=$(echo "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//') >> GITHUB_OUTPUT
       # yamllint enable rule:line-length
