@@ -151,5 +151,6 @@ runs:
         # Perform following replacements: %->%25 \n->%0A \r->%0D, keeping the
         # line ending marker out. The complex sed newline replacement is
         # because sed works line-by-line.
-        echo "images=$(printf %s "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//')" >> $GITHUB_OUTPUT
+        images_output=$(printf '%s\n' "$(printf %s "$images" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed -e ':a;N;$!ba;s/\n/%0A/g' | sed -e 's/%0D$//')")
+        echo "images=${images_output}" >> $GITHUB_OUTPUT
       # yamllint enable rule:line-length
