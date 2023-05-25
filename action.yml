@@ -145,6 +145,7 @@ runs:
                     -i '${{ inputs.init }}' \
                     -c '${{ inputs.cleanup }}' \
                     ${{ inputs.options }} )
+        echo "Printing images from docker-compose-build: "
         printf '%s\n' "$images"
         # Perform following replacements: %->%25 \n->%0A \r->%0D, keeping the
         # line ending marker out. The complex sed newline replacement is
